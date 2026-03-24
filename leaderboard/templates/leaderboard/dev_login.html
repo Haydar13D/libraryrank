@@ -1,0 +1,52 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dev Login — LibraryRank</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#0d0f14;--surface:#161923;--surface2:#1e2330;--border:rgba(255,255,255,.07);--gold:#f5c842;--text:#eef2ff;--muted:#8892aa;--red:#ff5c5c;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:24px;padding:40px;width:100%;max-width:400px;position:relative;overflow:hidden;}
+  .card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--gold),#ff914d);}
+  .logo{font-family:'Syne',sans-serif;font-weight:800;font-size:1.5rem;background:linear-gradient(135deg,var(--gold),#ff914d);-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-align:center;margin-bottom:6px;}
+  .dev-badge{text-align:center;margin-bottom:28px;}
+  .dev-badge span{background:rgba(255,92,92,.12);border:1px solid rgba(255,92,92,.3);color:var(--red);font-size:.75rem;font-weight:700;padding:4px 12px;border-radius:20px;text-transform:uppercase;letter-spacing:.05em;}
+  label{display:block;font-size:.82rem;color:var(--muted);margin-bottom:6px;margin-top:16px;}
+  input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:.9rem;outline:none;transition:border-color .2s;}
+  input:focus{border-color:rgba(245,200,66,.4);}
+  .btn{width:100%;margin-top:22px;padding:13px;background:linear-gradient(135deg,var(--gold),#e8a020);border:none;border-radius:12px;font-family:'Syne',sans-serif;font-weight:700;font-size:.95rem;color:#000;cursor:pointer;transition:opacity .2s;}
+  .btn:hover{opacity:.9;}
+  .errors{background:rgba(255,92,92,.1);border:1px solid rgba(255,92,92,.3);border-radius:10px;padding:10px 14px;margin-top:14px;font-size:.82rem;color:var(--red);}
+  .note{margin-top:20px;font-size:.78rem;color:var(--muted);text-align:center;line-height:1.5;}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">📚 LibraryRank</div>
+  <div class="dev-badge"><span>⚠️ Local Dev Mode</span></div>
+
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ next }}">
+    {% if form.errors %}
+    <div class="errors">Invalid username or password.</div>
+    {% endif %}
+    <label>Username</label>
+    <input type="text" name="username" autofocus autocomplete="username" placeholder="admin">
+    <label>Password</label>
+    <input type="password" name="password" autocomplete="current-password" placeholder="••••••••">
+    <button type="submit" class="btn">Sign In</button>
+  </form>
+
+  <p class="note">
+    This login is only for <strong>local development</strong>.<br>
+    In production, users sign in via <strong>University CAS SSO</strong>.<br><br>
+    Use the superuser you created with <code>python manage.py createsuperuser</code>.
+  </p>
+</div>
+</body>
+</html>

@@ -1,0 +1,140 @@
+{% extends "leaderboard/base.html" %}
+{% load static %}
+
+{% block content %}
+
+<div class="hero">
+  <div class="hero-glow"></div>
+  <h1>University Library<br><span>Leaderboard</span></h1>
+  <p>Celebrating top readers, visitors &amp; academic excellence across all faculties.</p>
+</div>
+
+<div class="stats-bar" id="statsBar">
+  <div class="stat-chip"><span class="dot" style="background:var(--blue)"></span><strong id="statVisitors">—</strong>&nbsp;Total Visitors</div>
+  <div class="stat-chip"><span class="dot" style="background:var(--green)"></span><strong id="statBooks">—</strong>&nbsp;Books Borrowed</div>
+  <div class="stat-chip"><span class="dot" style="background:var(--purple)"></span><strong id="statMembers">—</strong>&nbsp;Active Members</div>
+  <div class="stat-chip"><span class="dot" style="background:var(--orange)"></span><strong id="statFaculties">—</strong>&nbsp;Faculties</div>
+</div>
+
+<!-- CONTROLS -->
+<div class="controls">
+  <div class="search-wrap">
+    <span class="search-icon">🔍</span>
+    <input type="text" id="searchInput" placeholder="Search by name, ID, or faculty..." value="{{ search_q }}">
+  </div>
+  <input type="date" class="date-input" id="dateFrom" value="{{ date_from }}">
+  <span class="date-sep">to</span>
+  <input type="date" class="date-input" id="dateTo" value="{{ date_to }}">
+  <button class="btn-exp g" id="btnExcelExport">📊 Excel</button>
+  <button class="btn-exp r" id="btnPdfExport">📄 PDF</button>
+</div>
+
+<!-- TABS -->
+<div class="tab-nav">
+  <button class="tab-btn active" data-tab="overview">🏆 Overview</button>
+  <button class="tab-btn" data-tab="students">🎓 Students</button>
+  <button class="tab-btn" data-tab="lecturers">👨‍🏫 Lecturers</button>
+  <button class="tab-btn" data-tab="staff">👔 Staff</button>
+  <button class="tab-btn" data-tab="books">📖 Books &amp; Borrowers</button>
+  <button class="tab-btn" data-tab="faculties">🏛️ Faculties</button>
+</div>
+
+<!-- MAIN CONTENT PANELS -->
+<div class="main">
+
+  <!-- OVERVIEW -->
+  <div id="panel-overview" class="panel active">
+    <div class="nomination-grid" id="nominations">
+      <div class="nom-skeleton nom-card students"></div>
+      <div class="nom-skeleton nom-card lecturers"></div>
+      <div class="nom-skeleton nom-card staff"></div>
+    </div>
+    <div class="section-title">🏆 All-Time Top Visitors</div>
+    <div class="leaderboard-list" id="overviewList">
+      {% for i in "0123456" %}<div class="lb-skeleton"></div>{% endfor %}
+    </div>
+  </div>
+
+  <!-- STUDENTS -->
+  <div id="panel-students" class="panel">
+    <div class="section-title">🎓 Student Rankings</div>
+    <div class="two-col">
+      <div class="card-block">
+        <h3 style="margin-bottom:16px;">🚶 Top Visitors</h3>
+        <div class="leaderboard-list" id="list-students-visitors"></div>
+      </div>
+      <div class="card-block">
+        <h3 style="margin-bottom:16px;">📚 Top Borrowers</h3>
+        <div class="leaderboard-list" id="list-students-borrowers"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LECTURERS -->
+  <div id="panel-lecturers" class="panel">
+    <div class="section-title">👨‍🏫 Lecturer Rankings</div>
+    <div class="two-col">
+      <div class="card-block">
+        <h3 style="margin-bottom:16px;">🚶 Top Visitors</h3>
+        <div class="leaderboard-list" id="list-lecturers-visitors"></div>
+      </div>
+      <div class="card-block">
+        <h3 style="margin-bottom:16px;">📚 Top Borrowers</h3>
+        <div class="leaderboard-list" id="list-lecturers-borrowers"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STAFF -->
+  <div id="panel-staff" class="panel">
+    <div class="section-title">👔 Staff Rankings</div>
+    <div class="two-col">
+      <div class="card-block">
+        <h3 style="margin-bottom:16px;">🚶 Top Visitors</h3>
+        <div class="leaderboard-list" id="list-staff-visitors"></div>
+      </div>
+      <div class="card-block">
+        <h3 style="margin-bottom:16px;">📚 Top Borrowers</h3>
+        <div class="leaderboard-list" id="list-staff-borrowers"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOOKS -->
+  <div id="panel-books" class="panel">
+    <div class="section-title">📖 Books &amp; Top Borrowers</div>
+    <div class="two-col">
+      <div class="card-block">
+        <h3>📚 Most Borrowed Books</h3>
+        <div id="booksList"></div>
+      </div>
+      <div class="card-block">
+        <h3>🏅 Top Book Borrowers</h3>
+        <div class="leaderboard-list" id="borrowerList"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FACULTIES -->
+  <div id="panel-faculties" class="panel">
+    <div class="section-title">🏛️ Faculty Activity Rankings</div>
+    <div class="card-block" style="margin-bottom:24px">
+      <h3>📊 Visitor Distribution by Faculty</h3>
+      <div id="facultyBars" style="display:flex;flex-direction:column;gap:16px;margin-top:12px"></div>
+    </div>
+    <div class="section-title">📚 Books &amp; Top Students by Faculty</div>
+    <div class="two-col">
+      <div class="card-block">
+        <h3>🔖 Books Borrowed per Faculty</h3>
+        <div id="facultyBooks"></div>
+      </div>
+      <div class="card-block">
+        <h3>🙋 Top Student per Faculty</h3>
+        <div id="facultyTopStudents"></div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+{% endblock %}

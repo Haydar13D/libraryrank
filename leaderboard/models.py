@@ -1,7 +1,57 @@
 from django.db import models
 from django.contrib.auth.models import User
+import uuid
 from django.utils import timezone
 from datetime import timedelta
+
+
+class LevelTier(models.Model):
+    name = models.CharField(max_length=50)
+    level_num = models.IntegerField(unique=True)
+    min_xp = models.IntegerField()
+    max_xp = models.IntegerField(null=True, blank=True)
+    color = models.CharField(max_length=7, default='#95a5a6')
+
+    class Meta:
+        ordering = ['min_xp']
+
+    def __str__(self):
+        return f"Level {self.level_num}: {self.name}"
+
+
+class BadgeRule(models.Model):
+    CRITERIA_CHOICES = [
+        ('visits_week', 'Visits in last 7 days'),
+        ('visits_month_top10', 'Top 10 Visits this month'),
+        ('borrows_semester', 'Borrows in last 6 months'),
+        ('custom', 'Custom / Manual'),
+    ]
+    id_code = models.CharField(max_length=50, unique=True)
+    name = models.CharField(max_length=50)
+    icon = models.CharField(max_length=10)
+    image_url = models.CharField(max_length=200)
+    color = models.CharField(max_length=7)
+    desc = models.CharField(max_length=200)
+    criteria_type = models.CharField(max_length=50, choices=CRITERIA_CHOICES)
+    min_value = models.IntegerField(default=0)
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
+class PointPolicy(models.Model):
+    action_type = models.CharField(max_length=50, unique=True, help_text="Contoh: visit, borrow, return_on_time, review_book")
+    points = models.IntegerField(default=10)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name_plural = 'Point Policies'
+
+    def __str__(self):
+        return f"{self.action_type.capitalize()} = {self.points} XP"
 
 
 class Faculty(models.Model):
@@ -98,52 +148,71 @@ class Member(models.Model):
         """Dynamic badge calculation based on visits and borrows."""
         result = []
         now = timezone.now()
-
-        # 1. Weekly Warrior 🥈 (3 visits in the last 7 days)
-        week_ago = now - timedelta(days=7)
-        if self.visits.filter(visited_at__gte=week_ago).count() >= 3:
-            result.append({
-                'id': 'weekly_warrior',
-                'name': 'Weekly Warrior',
-                'icon': '🥈',
-                'image_url': '/static/img/badges/weekly warior.png', # Gunakan garis miring (/) dan tambah / di awal
-                'color': '#bdc3c7', # silver
-                'desc': 'Datang ke perpus 3x dalam seminggu'
-            })
-
-        # 2. Library Legend 🥇 (Top 10 visitors this month)
-        start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        my_month_visits = self.visits.filter(visited_at__gte=start_of_month).count()
-        if my_month_visits > 0:
-            from django.db.models import Count, Q
-            # Get the 10th highest visit count this month
-            top_10 = Member.objects.annotate(
-                m_visits=Count('visits', filter=Q(visits__visited_at__gte=start_of_month))
-            ).filter(m_visits__gt=0).order_by('-m_visits')[:10]
+        for rule in BadgeRule.objects.all():
+            earned = False
+            if rule.criteria_type == 'visits_week':
+                week_ago = now - timedelta(days=7)
+                if self.visits.filter(visited_at__gte=week_ago).count() >= rule.min_value:
+                    earned = True
+            elif rule.criteria_type == 'borrows_semester':
+                semester_ago = now - timedelta(days=180)
+                if self.borrow_records.filter(borrowed_at__gte=semester_ago).count() >= rule.min_value:
+                    earned = True
+            elif rule.criteria_type == 'visits_month_top10':
+                start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+                my_month_visits = self.visits.filter(visited_at__gte=start_of_month).count()
+                if my_month_visits > 0:
+                    from django.db.models import Count, Q
+                    top_10 = Member.objects.annotate(
+                        m_visits=Count('visits', filter=Q(visits__visited_at__gte=start_of_month))
+                    ).filter(m_visits__gt=0).order_by('-m_visits')[:max(1, rule.min_value)]
+                    if self in top_10:
+                        earned = True
             
-            if self in top_10:
+            if earned:
                 result.append({
-                    'id': 'library_legend',
-                    'name': 'Library Legend',
-                    'icon': '🥇',
-                    'image_url': '/static/img/badges/top 10 leaderboard.png', # Gunakan garis miring (/) dan tambah / di awal
-                    'color': '#f1c40f', # gold
-                    'desc': 'Top 10 Leaderboard bulan ini'
+                    'id': rule.id_code,
+                    'name': rule.name,
+                    'icon': rule.icon,
+                    'image_url': rule.image_url,
+                    'color': rule.color,
+                    'desc': rule.desc
                 })
-
-        # 3. Book Worm 📚 (> 5 books borrowed in the last 6 months / 1 semester)
-        semester_ago = now - timedelta(days=180)
-        if self.borrow_records.filter(borrowed_at__gte=semester_ago).count() > 5:
-            result.append({
-                'id': 'book_worm',
-                'name': 'Book Worm',
-                'icon': '📚',
-                'image_url': '/static/img/badges/bookworm.png', # Gunakan garis miring (/) dan tambah / di awal
-                'color': '#9b59b6', # purple
-                'desc': 'Meminjam > 5 buku dalam 1 semester'
-            })
-
         return result
+
+    @property
+    def total_points_all_time(self):
+        v = self.visits.aggregate(total=models.Sum('earned_points'))['total'] or 0
+        b = self.borrow_records.aggregate(total=models.Sum('earned_points'))['total'] or 0
+        return v + b
+
+    @property
+    def level_info(self):
+        xp = self.total_points_all_time
+        tiers = list(LevelTier.objects.all().order_by('min_xp'))
+        if not tiers:
+            return {'name': 'Visitor', 'level_num': 1, 'current_xp': xp, 'min_xp': 0, 'max_xp': 100, 'progress_perc': 0, 'color': '#95a5a6'}
+            
+        for tier in tiers:
+            if tier.max_xp is None or xp <= tier.max_xp:
+                progress = 100
+                if tier.max_xp is not None:
+                    denom = max(1, tier.max_xp - tier.min_xp)
+                    progress = int(((xp - tier.min_xp) / denom) * 100)
+                return {
+                    'name': tier.name,
+                    'level_num': tier.level_num,
+                    'current_xp': xp,
+                    'min_xp': tier.min_xp,
+                    'max_xp': tier.max_xp if tier.max_xp is not None else xp,
+                    'progress_perc': min(100, progress),
+                    'color': tier.color
+                }
+        highest = tiers[-1]
+        return {
+            'name': highest.name, 'level_num': highest.level_num, 'current_xp': xp, 
+            'min_xp': highest.min_xp, 'max_xp': xp, 'progress_perc': 100, 'color': highest.color
+        }
 
 
 class Book(models.Model):
@@ -172,12 +241,20 @@ class Visit(models.Model):
     visited_at = models.DateTimeField(default=timezone.now)
     purpose = models.CharField(max_length=200, blank=True)
     notes = models.TextField(blank=True)
+    earned_points = models.IntegerField(default=0)
 
     class Meta:
         ordering = ['-visited_at']
 
     def __str__(self):
         return f"{self.member.name} — {self.visited_at.strftime('%Y-%m-%d %H:%M')}"
+
+    def save(self, *args, **kwargs):
+        if not self.pk and self.earned_points == 0:
+            policy = PointPolicy.objects.filter(action_type='visit', is_active=True).first()
+            if policy:
+                self.earned_points = policy.points
+        super().save(*args, **kwargs)
 
 
 class BorrowRecord(models.Model):
@@ -193,6 +270,7 @@ class BorrowRecord(models.Model):
     due_date = models.DateField()
     returned_at = models.DateTimeField(null=True, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='borrowed')
+    earned_points = models.IntegerField(default=0)
 
     class Meta:
         ordering = ['-borrowed_at']
@@ -201,8 +279,60 @@ class BorrowRecord(models.Model):
         return f"{self.member.name} ← {self.book.title}"
 
     def save(self, *args, **kwargs):
+        if not self.pk and self.earned_points == 0:
+            policy = PointPolicy.objects.filter(action_type='borrow', is_active=True).first()
+            if policy:
+                self.earned_points = policy.points
         if not self.due_date:
             self.due_date = (timezone.now() + timezone.timedelta(days=14)).date()
         if self.returned_at and self.status == 'borrowed':
             self.status = 'returned'
         super().save(*args, **kwargs)
+
+class SystemLog(models.Model):
+    timestamp = models.DateTimeField(auto_now_add=True)
+    action = models.CharField(max_length=100)
+    duration_ms = models.FloatField(default=0)
+    details = models.TextField(blank=True)
+    
+    class Meta:
+        ordering = ['-timestamp']
+        verbose_name = 'System Log'
+        verbose_name_plural = 'System Logs'
+        
+    def __str__(self):
+        return f"[{self.timestamp.strftime('%Y-%m-%d %H:%M:%S')}] {self.action} ({self.duration_ms}ms)"
+
+class Reward(models.Model):
+    name = models.CharField(max_length=150)
+    description = models.TextField()
+    points_cost = models.IntegerField(default=100)
+    stock = models.IntegerField(default=10)
+    image_url = models.CharField(max_length=200, blank=True)
+    is_active = models.BooleanField(default=True)
+    
+    class Meta:
+        ordering = ['points_cost']
+        
+    def __str__(self):
+        return f"{self.name} ({self.points_cost} XP)"
+
+class PointTransaction(models.Model):
+    TYPE_CHOICES = [
+        ('event', 'Event Participation'),
+        ('redeem', 'Redeem Reward'),
+        ('manual', 'Manual Adjustment'),
+    ]
+    cardnumber = models.CharField(max_length=50, db_index=True)
+    amount = models.IntegerField(help_text="Format: + for event, - for redemption")
+    transaction_type = models.CharField(max_length=20, choices=TYPE_CHOICES, default='manual')
+    description = models.CharField(max_length=250)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        
+    def __str__(self):
+        return f"{self.cardnumber} | {self.amount} ({self.transaction_type})"
+
+

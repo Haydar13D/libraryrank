@@ -151,7 +151,7 @@ class Command(BaseCommand):
             days_ago = random.randint(0, 29)
             hours_ago = random.randint(8, 18)
             dt = now - timedelta(days=days_ago, hours=hours_ago, minutes=random.randint(0, 59))
-            visits.append(Visit(member=member, visited_at=dt))
+            visits.append(Visit(member=member, visited_at=dt, earned_points=5))
         Visit.objects.bulk_create(visits)
 
     def _create_borrows(self, member, count, books, now):
@@ -170,5 +170,6 @@ class Command(BaseCommand):
             BorrowRecord.objects.create(
                 member=member, book=book,
                 borrowed_at=dt, due_date=due,
-                status=status, returned_at=returned_at
+                status=status, returned_at=returned_at,
+                earned_points=15 if status == 'returned' else 5
             )

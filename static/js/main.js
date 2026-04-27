@@ -102,7 +102,7 @@ async function fetchOverview(params) {
     const data = await res.json();
     renderStats(data.stats);
     renderNominations(data.nominations);
-    renderList('overviewList', data.leaderboard, null, true);
+    renderList('overviewList', data.leaderboard, null, true, 'visits', 'XP');
   } catch (e) { console.error(e); }
 }
 
@@ -110,7 +110,7 @@ async function fetchRole(role, params) {
   try {
     const res = await fetch(`/api/pemustaka-teraktif/?role=${role}&${params}`);
     const data = await res.json();
-    renderList(`list-${role}s-visitors`, data.top_pengunjung, role, false, 'visits', 'kunjungan');
+    renderList(`list-${role}s-visitors`, data.top_pengunjung, role, false, 'visits', 'XP');
     renderList(`list-${role}s-borrowers`, data.top_peminjam, role, false, 'books', 'buku');
   } catch (e) { console.error(e); }
 }
@@ -175,7 +175,7 @@ function renderNominations(noms) {
         <div class="nom-detail">${n.faculty}${n.title ? ' · ' + n.title : ''}</div>
         <div class="nom-stat" style="background:${bg.replace('.18)', '.08)')};border:1px solid ${bg.replace('.18)', '.25)')}">
           <strong style="color:${text}">${n.visits}</strong>
-          <span>visits this period</span>
+          <span>XP this period</span>
         </div>
       </div>`;
   }).join('');
@@ -349,14 +349,25 @@ function renderModal(data, role) {
   const borrows = data.recent_borrows || [];
   const badges = data.badges || [];
 
-  const shareText = encodeURIComponent(`Saya baru saja meraih prestasi di LibraryRank Universitas! Cek profil ${data.name} dengan ${data.visits_total} kunjungan.`);
+  const shareText = encodeURIComponent(`Saya baru saja meraih prestasi di LibraryRank Universitas! Cek profil ${data.name} dengan total XP ${data.visits_total}.`);
   const shareUrl = encodeURIComponent(window.location.origin);
+  const lvl = data.level || { name: 'Visitor', progress_perc: 0, current_xp: 0, max_xp: 100, color: '#95a5a6' };
 
   document.getElementById('modalBody').innerHTML = `
     <div id="captureCard" style="padding:24px 10px 10px; border-radius:12px; background:var(--surface); text-align:center;">
-      <div class="modal-avatar" style="background:${bg};color:${text};margin:0 auto 12px;width:72px;height:72px;font-size:1.8rem;line-height:72px;">${data.initials}</div>
+      <div class="modal-avatar" style="border: 3px solid ${lvl.color}; background:${bg};color:${text};margin:0 auto 12px;width:72px;height:72px;font-size:1.8rem;line-height:66px;">${data.initials}</div>
       <div class="modal-name">${data.name}</div>
       <div class="modal-sub">${data.id} · ${data.faculty || data.department || ''} ${data.year ? '· ' + data.year : ''}</div>
+      
+      <div style="margin: 16px auto 0; max-width: 80%;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:6px; font-size:0.8rem; font-weight:700;">
+          <span style="color:${lvl.color}; text-transform:uppercase; font-size:11px; letter-spacing:1px">${lvl.name}</span>
+          <span style="color:var(--text); font-size:11px">${lvl.current_xp} / ${lvl.max_xp == lvl.current_xp ? 'MAX' : lvl.max_xp} XP</span>
+        </div>
+        <div style="height:8px; border-radius:4px; background:var(--border); overflow:hidden;">
+          <div style="height:100%; width:${lvl.progress_perc}%; background:${lvl.color}; transition: width 1s ease;"></div>
+        </div>
+      </div>
       
       <div class="modal-stats" style="margin-top:20px; display:flex; justify-content:center; gap:16px;">
         <div class="modal-stat"><strong style="color:${text}">${data.visits_total}</strong><span>Total Visits</span></div>
@@ -369,7 +380,7 @@ function renderModal(data, role) {
         <h4 style="margin-bottom:12px;font-size:.85rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;text-align:center;">🏆 Prestasi / Badges</h4>
         <div style="display:flex; flex-direction:column; gap:10px;">
           ${badges.map(b => `
-            <div style="display:flex; align-items:center; gap:12px; padding:12px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.02)">
+            <div style="display:flex; align-items:center; gap:12px; padding:12px; border-radius:10px; border:1px solid var(--border); background:rgba(47,49,133,0.04)">
               <div style="font-size:1.8rem; width:48px; height:48px; display:flex; align-items:center; justify-content:center; background:${b.image_url ? 'none' : b.color+'20'}; border-radius:50%;flex-shrink:0;">
                 ${b.image_url ? `<img src="${b.image_url}" alt="${b.name}" style="width:100%; height:100%; object-fit:contain;">` : b.icon}
               </div>
@@ -403,7 +414,7 @@ async function downloadIGStory() {
   if (!card) return;
   try {
     const canvas = await html2canvas(card, { 
-      backgroundColor: '#151723', // matching theme background roughly
+      backgroundColor: '#282A6A', // matching theme background roughly
       scale: 2, 
       logging: false 
     });

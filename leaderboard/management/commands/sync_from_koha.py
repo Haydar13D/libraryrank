@@ -143,52 +143,54 @@ class Command(BaseCommand):
         member_map = {}  # borrowernumber → Member instance
         created_count = updated_count = skipped_count = 0
 
-        for row in rows:
-            (borrowernumber, cardnumber, surname, firstname,
-             categorycode, branchcode, dateenrolled, email,
-             category_desc) = row
+        with transaction.atomic():
+            for row in rows:
+                (borrowernumber, cardnumber, surname, firstname,
+                 categorycode, branchcode, dateenrolled, email,
+                 category_desc) = row
 
-            cat_upper = (categorycode or '').upper()
-            if cat_upper in student_cats:
-                role = 'student'
-            elif cat_upper in lecturer_cats:
-                role = 'lecturer'
-            elif cat_upper in staff_cats:
-                role = 'staff'
-            else:
-                skipped_count += 1
-                continue  # skip unknown categories
-
-            full_name = f"{(firstname or '').strip()} {(surname or '').strip()}".strip()
-            if not full_name:
-                full_name = cardnumber or f'Patron-{borrowernumber}'
-
-            faculty = faculty_map.get(branchcode)
-            year_enrolled = None
-            if dateenrolled and role == 'student':
-                year_enrolled = dateenrolled.year if hasattr(dateenrolled, 'year') else None
-
-            member_id = cardnumber or f'KOHA-{borrowernumber}'
-
-            if not self.dry_run:
-                member, created = Member.objects.update_or_create(
-                    member_id=member_id,
-                    defaults={
-                        'name': full_name,
-                        'role': role,
-                        'faculty': faculty,
-                        'year_enrolled': year_enrolled,
-                        'title': category_desc or '',
-                        'is_active': True,
-                    }
-                )
-                member_map[borrowernumber] = member
-                if created:
-                    created_count += 1
+                cat_upper = (categorycode or '').upper()
+                if cat_upper in student_cats:
+                    role = 'student'
+                elif cat_upper in lecturer_cats:
+                    role = 'lecturer'
+                elif cat_upper in staff_cats:
+                    role = 'staff'
                 else:
-                    updated_count += 1
-            else:
-                self.stdout.write(f'   [dry] {role}: {full_name} ({member_id})')
+                    skipped_count += 1
+                    continue  # skip unknown categories
+
+                full_name = f"{(firstname or '').strip()} {(surname or '').strip()}".strip()
+                if not full_name:
+                    full_name = cardnumber or f'Patron-{borrowernumber}'
+                full_name = full_name[:150]
+
+                faculty = faculty_map.get(branchcode)
+                year_enrolled = None
+                if dateenrolled and role == 'student':
+                    year_enrolled = dateenrolled.year if hasattr(dateenrolled, 'year') else None
+
+                member_id = str(cardnumber or f'KOHA-{borrowernumber}')[:20]
+
+                if not self.dry_run:
+                    member, created = Member.objects.update_or_create(
+                        member_id=member_id,
+                        defaults={
+                            'name': full_name,
+                            'role': role,
+                            'faculty': faculty,
+                            'year_enrolled': year_enrolled,
+                            'title': (category_desc or '')[:100],
+                            'is_active': True,
+                        }
+                    )
+                    member_map[borrowernumber] = member
+                    if created:
+                        created_count += 1
+                    else:
+                        updated_count += 1
+                else:
+                    self.stdout.write(f'   [dry] {role}: {full_name} ({member_id})')
 
         self.stdout.write(
             f'   ✅ Members: {created_count} created, {updated_count} updated, {skipped_count} skipped (unknown category)'
@@ -222,29 +224,30 @@ class Command(BaseCommand):
         book_map = {}  # biblionumber → Book instance
         created_count = updated_count = 0
 
-        for row in rows:
-            biblionumber, title, author, isbn, itemtype, homebranch = row
-            if not title:
-                continue
+        with transaction.atomic():
+            for row in rows:
+                biblionumber, title, author, isbn, itemtype, homebranch = row
+                if not title:
+                    continue
 
-            isbn_clean = (isbn or '').strip()[:20] or f'KOHA-BIB-{biblionumber}'
-            faculty = faculty_map.get(homebranch)
+                isbn_clean = (isbn or '').strip()[:20] or f'KOHA-BIB-{biblionumber}'
+                faculty = faculty_map.get(homebranch)
 
-            if not self.dry_run:
-                book, created = Book.objects.update_or_create(
-                    isbn=isbn_clean,
-                    defaults={
-                        'title': (title or '')[:300],
-                        'author': (author or 'Unknown')[:200],
-                        'category': (itemtype or 'General')[:100],
-                        'faculty': faculty,
-                    }
-                )
-                book_map[biblionumber] = book
-                if created:
-                    created_count += 1
-                else:
-                    updated_count += 1
+                if not self.dry_run:
+                    book, created = Book.objects.update_or_create(
+                        isbn=isbn_clean,
+                        defaults={
+                            'title': (title or '')[:300],
+                            'author': (author or 'Unknown')[:200],
+                            'category': (itemtype or 'General')[:100],
+                            'faculty': faculty,
+                        }
+                    )
+                    book_map[biblionumber] = book
+                    if created:
+                        created_count += 1
+                    else:
+                        updated_count += 1
 
         self.stdout.write(f'   ✅ Books: {created_count} created, {updated_count} updated')
         return book_map
@@ -276,24 +279,28 @@ class Command(BaseCommand):
         created = skipped = 0
         visits_to_create = []
 
-        for borrowernumber, dt, branch, stat_type in rows:
-            member = member_map.get(borrowernumber)
-            if not member:
-                skipped += 1
-                continue
+        with transaction.atomic():
+            for borrowernumber, dt, branch, stat_type in rows:
+                member = member_map.get(borrowernumber)
+                if not member:
+                    skipped += 1
+                    continue
 
-            if not self.dry_run:
-                # Use get_or_create to avoid duplicate visits per member per hour
-                visit_dt = dt if hasattr(dt, 'tzinfo') else timezone.make_aware(dt)
-                # Round to hour to deduplicate same-session events
-                visit_hour = visit_dt.replace(minute=0, second=0, microsecond=0)
-                _, created_flag = Visit.objects.get_or_create(
-                    member=member,
-                    visited_at__date=visit_hour.date(),
-                    defaults={'visited_at': visit_dt, 'purpose': f'Koha: {stat_type}'}
-                )
-                if created_flag:
-                    created += 1
+                if not self.dry_run:
+                    # Use get_or_create to avoid duplicate visits per member per day
+                    visit_dt = dt if hasattr(dt, 'tzinfo') else timezone.make_aware(dt)
+                    from datetime import time
+                
+                    # Bonus Early Bird: +3 points if visited before 09:00 AM (Total 5 points, else 2 points)
+                    visit_points = 5 if visit_dt.time() < time(9, 0) else 2
+                
+                    _, created_flag = Visit.objects.get_or_create(
+                        member=member,
+                        visited_at__date=visit_dt.date(),
+                        defaults={'visited_at': visit_dt, 'purpose': f'Koha: {stat_type}', 'earned_points': visit_points}
+                    )
+                    if created_flag:
+                        created += 1
 
         self.stdout.write(f'   ✅ Visits: {created} created, {skipped} skipped (patron not in system)')
 
@@ -338,37 +345,56 @@ class Command(BaseCommand):
 
         created = skipped = 0
 
-        for row in rows:
-            borrowernumber, itemnumber, biblionumber, issuedate, date_due, returndate, status = row
+        with transaction.atomic():
+            for row in rows:
+                borrowernumber, itemnumber, biblionumber, issuedate, date_due, returndate, status = row
 
-            member = member_map.get(borrowernumber)
-            book   = book_map.get(biblionumber)
+                member = member_map.get(borrowernumber)
+                book   = book_map.get(biblionumber)
 
-            if not member or not book:
-                skipped += 1
-                continue
+                if not member or not book:
+                    skipped += 1
+                    continue
 
-            if not self.dry_run:
-                issue_dt   = timezone.make_aware(issuedate) if issuedate and not hasattr(issuedate, 'tzinfo') else issuedate
-                return_dt  = timezone.make_aware(returndate) if returndate and not hasattr(returndate, 'tzinfo') else returndate
-                due_date   = date_due if isinstance(date_due, date) else (date_due.date() if date_due else None)
+                if not self.dry_run:
+                    issue_dt   = timezone.make_aware(issuedate) if issuedate and not hasattr(issuedate, 'tzinfo') else issuedate
+                    return_dt  = timezone.make_aware(returndate) if returndate and not hasattr(returndate, 'tzinfo') else returndate
+                    due_date   = date_due if isinstance(date_due, date) else (date_due.date() if date_due else None)
 
-                # Determine overdue status
-                if status == 'borrowed' and due_date and due_date < date.today():
-                    status = 'overdue'
+                    # Determine overdue status
+                    if status == 'borrowed' and due_date and due_date < date.today():
+                        status = 'overdue'
 
-                _, flag = BorrowRecord.objects.get_or_create(
-                    member=member,
-                    book=book,
-                    borrowed_at__date=issue_dt.date() if issue_dt else date.today(),
-                    defaults={
-                        'borrowed_at': issue_dt or timezone.now(),
-                        'due_date': due_date or (date.today() + timedelta(days=14)),
-                        'returned_at': return_dt,
-                        'status': status,
-                    }
-                )
-                if flag:
-                    created += 1
+                    # Calculate gamification points
+                    points = 5 # Base borrow points
+                
+                    if status == 'returned' and return_dt and issue_dt:
+                        duration_hours = (return_dt - issue_dt).total_seconds() / 3600
+                        if duration_hours >= 24:
+                            points += 10 # On-time / valid return
+                            if due_date and return_dt.date() > due_date:
+                                days_late = (return_dt.date() - due_date).days
+                                points -= days_late * 5 # Late penalty
+                    elif status == 'overdue' and due_date:
+                        days_late = (date.today() - due_date).days
+                        points -= days_late * 5 # Live late penalty
+                
+                    # Prevent absurdly negative points for extremely old unreturned books
+                    if points < -50: points = -50
+
+                    _, flag = BorrowRecord.objects.update_or_create(
+                        member=member,
+                        book=book,
+                        borrowed_at__date=issue_dt.date() if issue_dt else date.today(),
+                        defaults={
+                            'borrowed_at': issue_dt or timezone.now(),
+                            'due_date': due_date or (date.today() + timedelta(days=14)),
+                            'returned_at': return_dt,
+                            'status': status,
+                            'earned_points': points
+                        }
+                    )
+                    if flag:
+                        created += 1
 
         self.stdout.write(f'   ✅ Borrow records: {created} created, {skipped} skipped')

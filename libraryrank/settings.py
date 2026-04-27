@@ -16,6 +16,7 @@ DEBUG        = env('DEBUG', default=True)
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1', '*'])
 
 INSTALLED_APPS = [
+    'unfold',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -33,7 +34,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django_cas_ng.middleware.CASMiddleware',
+    # 'django_cas_ng.middleware.CASMiddleware',  # Nonaktifkan SSO sementara
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -76,7 +77,7 @@ DATABASES = {
         'NAME':     env('DB_NAME',     default='libraryrank_db'),
         'USER':     env('DB_USER',     default='libraryrank_user'),
         'PASSWORD': env('DB_PASSWORD', default=''),
-        'HOST':     env('DB_HOST',     default='127.0.0.1'),
+        'HOST':     env('DB_HOST',     default='[IP_ADDRESS]'),
         'PORT':     env('DB_PORT',     default='3306'),
         'OPTIONS': {
             'charset': 'utf8mb4',
@@ -169,3 +170,71 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
+
+# UNFOLD ADMIN SETTINGS
+from django.templatetags.static import static
+
+UNFOLD = {
+    'SITE_TITLE': 'LibraryRank Admin',
+    'SITE_HEADER': 'LibraryRank Command Center',
+    'SITE_SYMBOL': 'speed', # Material icon
+    'COLORS': {
+        'primary': {
+            '50': '#ebf8f8',
+            '100': '#ceedec',
+            '200': '#a2dbd8',
+            '300': '#6bc4bf',
+            '400': '#3bb0a7',
+            '500': '#1cbdb3', # LibraryRank Green Original
+            '600': '#159890',
+            '700': '#117b74',
+            '800': '#0d5e59',
+            '900': '#094340',
+            '950': '#052927',
+        },
+    },
+    "TABS": [
+        {
+            "models": [
+                "leaderboard.member",
+                "leaderboard.faculty",
+                "leaderboard.book",
+            ],
+            "items": [
+                {
+                    "title": "Members",
+                    "link": "/admin/leaderboard/member/",
+                },
+                {
+                    "title": "Faculties",
+                    "link": "/admin/leaderboard/faculty/",
+                },
+                {
+                    "title": "Books",
+                    "link": "/admin/leaderboard/book/",
+                },
+            ],
+        },
+        {
+            "models": [
+                "leaderboard.badgerule",
+                "leaderboard.leveltier",
+                "leaderboard.pointpolicy",
+            ],
+            "items": [
+                {
+                    "title": "Badges",
+                    "link": "/admin/leaderboard/badgerule/",
+                },
+                {
+                    "title": "Levels",
+                    "link": "/admin/leaderboard/leveltier/",
+                },
+                {
+                    "title": "Point Policies",
+                    "link": "/admin/leaderboard/pointpolicy/",
+                },
+            ],
+        },
+    ],
+}

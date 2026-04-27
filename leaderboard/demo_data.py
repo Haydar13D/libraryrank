@@ -57,6 +57,32 @@ _FACULTIES = [
     {'name':'Biology','code':'BIO','color':'#41e0d0','visitors':101,'books':67},
 ]
 
+def _add_level(item):
+    item['visits'] = item['visits'] * 15 # scale up to look like XP points
+    xp = item['visits']
+    levels = [
+        (0, 100, 'Visitor', 1, '#95a5a6'),
+        (101, 300, 'Reader', 2, '#3498db'),
+        (301, 700, 'Scholar', 3, '#2ecc71'),
+        (701, 1500, 'Researcher', 4, '#9b59b6'),
+        (1501, 3000, 'Sage', 5, '#e67e22'),
+        (3001, float('inf'), 'Library Legend', 'MAX', '#f1c40f')
+    ]
+    for min_xp, max_xp, name, lv_num, color in levels:
+        if xp <= max_xp:
+            progress = 100
+            if max_xp != float('inf'):
+                progress = int(((xp - min_xp) / max(1, (max_xp - min_xp))) * 100)
+            item['level'] = {
+                'name': name, 'level_num': lv_num, 'current_xp': xp,
+                'min_xp': min_xp, 'max_xp': max_xp if max_xp != float('inf') else xp,
+                'progress_perc': min(100, progress), 'color': color
+            }
+            break
+
+for s in _STUDENTS + _LECTURERS + _STAFF:
+    _add_level(s)
+
 _ALL = sorted(_STUDENTS + _LECTURERS + _STAFF, key=lambda x: x['visits'], reverse=True)
 
 _TOP_PER_FAC = []

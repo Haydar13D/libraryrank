@@ -10,11 +10,49 @@
 </div>
 
 <div class="stats-bar" id="statsBar">
-  <div class="stat-chip"><span class="dot" style="background:var(--blue)"></span><strong id="statVisitors">—</strong>&nbsp;Total Visitors</div>
+  <div class="stat-chip"><span class="dot" style="background:var(--blue)"></span><strong id="statVisitors">—</strong>&nbsp;Total Kedatangan</div>
   <div class="stat-chip"><span class="dot" style="background:var(--green)"></span><strong id="statBooks">—</strong>&nbsp;Books Borrowed</div>
   <div class="stat-chip"><span class="dot" style="background:var(--purple)"></span><strong id="statMembers">—</strong>&nbsp;Active Members</div>
   <div class="stat-chip"><span class="dot" style="background:var(--orange)"></span><strong id="statFaculties">—</strong>&nbsp;Faculties</div>
 </div>
+
+<!-- REWARDS MARQUEE -->
+{% if rewards %}
+<div class="rewards-marquee-container" style="overflow: hidden; width: 100%; max-width: 1200px; margin: 20px auto; background: var(--bg-card); border-radius: 12px; padding: 15px 0; border: 1px solid rgba(255, 255, 255, 0.05); position: relative;">
+  <div class="section-title" style="margin-left: 20px; font-size: 1.2rem; margin-bottom: 10px;">🎁 Tukarkan Poin dengan Merchandise Spesial!</div>
+  
+  <div class="marquee-wrapper" style="display: flex; overflow: hidden; position: relative; width: 100%;">
+    <div class="marquee-track" style="display: flex; gap: 20px; animation: scroll-left 25s linear infinite; padding: 0 10px;">
+      
+      <!-- Copy array twice for infinite smooth scrolling -->
+      {% for i in "12" %}
+      {% for reward in rewards %}
+      <div class="marquee-item" style="flex-shrink: 0; width: 180px; background: rgba(0,0,0,0.2); border-radius: 8px; padding: 10px; border: 1px solid rgba(255,215,0,0.2); display: flex; flex-direction: column; align-items: center;">
+        {% if reward.image_url %}
+        <img src="{{ reward.image_url }}" alt="{{ reward.name }}" style="width: 100%; height: 120px; object-fit: cover; border-radius: 6px; margin-bottom: 10px;">
+        {% else %}
+        <div style="width: 100%; height: 120px; background: rgba(255,215,0,0.1); border-radius: 6px; margin-bottom: 10px; display: flex; align-items: center; justify-content: center; font-size: 3rem;">🎁</div>
+        {% endif %}
+        <h4 style="font-size: 0.9rem; margin: 0; text-align: center; color: white;">{{ reward.name }}</h4>
+        <span style="color: var(--gold); font-size: 0.8rem; font-weight: bold; margin-top: 5px;">{{ reward.points_cost }} XP</span>
+      </div>
+      {% endfor %}
+      {% endfor %}
+      
+    </div>
+  </div>
+</div>
+
+<style>
+@keyframes scroll-left {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(calc(-50% - 10px)); }
+}
+.marquee-track:hover {
+  animation-play-state: paused;
+}
+</style>
+{% endif %}
 
 <!-- CONTROLS -->
 <div class="controls">
@@ -49,7 +87,7 @@
       <div class="nom-skeleton nom-card lecturers"></div>
       <div class="nom-skeleton nom-card staff"></div>
     </div>
-    <div class="section-title">🏆 All-Time Top Visitors</div>
+    <div class="section-title">🏆 Top Poin (XP) Bulan Ini</div>
     <div class="leaderboard-list" id="overviewList">
       {% for i in "0123456" %}<div class="lb-skeleton"></div>{% endfor %}
     </div>
@@ -60,7 +98,7 @@
     <div class="section-title">🎓 Student Rankings</div>
     <div class="two-col">
       <div class="card-block">
-        <h3 style="margin-bottom:16px;">🚶 Top Visitors</h3>
+        <h3 style="margin-bottom:16px;">🚀 Top XP Leaderboard</h3>
         <div class="leaderboard-list" id="list-students-visitors"></div>
       </div>
       <div class="card-block">
@@ -75,7 +113,7 @@
     <div class="section-title">👨‍🏫 Lecturer Rankings</div>
     <div class="two-col">
       <div class="card-block">
-        <h3 style="margin-bottom:16px;">🚶 Top Visitors</h3>
+        <h3 style="margin-bottom:16px;">🚀 Top XP Leaderboard</h3>
         <div class="leaderboard-list" id="list-lecturers-visitors"></div>
       </div>
       <div class="card-block">
@@ -90,7 +128,7 @@
     <div class="section-title">👔 Staff Rankings</div>
     <div class="two-col">
       <div class="card-block">
-        <h3 style="margin-bottom:16px;">🚶 Top Visitors</h3>
+        <h3 style="margin-bottom:16px;">🚀 Top XP Leaderboard</h3>
         <div class="leaderboard-list" id="list-staff-visitors"></div>
       </div>
       <div class="card-block">

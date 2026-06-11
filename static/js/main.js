@@ -12,6 +12,15 @@ const ROLE_COLORS = {
   staff: { bg: 'rgba(255,145,77,.18)', text: 'var(--orange)' },
 };
 const BOOK_ICONS = { CS: '<span class="material-icons-outlined">computer</span>', Economics: '<span class="material-icons-outlined">trending_up</span>', Medicine: '<span class="material-icons-outlined">favorite</span>', Law: '<span class="material-icons-outlined">gavel</span>', Engineering: '<span class="material-icons-outlined">architecture</span>', Psychology: '<span class="material-icons-outlined">psychology</span>', Mathematics: '<span class="material-icons-outlined">straighten</span>', Chemistry: '<span class="material-icons-outlined">science</span>', default: '<span class="material-icons-outlined">library_books</span>' };
+const getBadgeIconHtml = (icon) => {
+  const badgeMap = {
+    '🥇': '<span class="material-icons-outlined" style="color:#FFB800; font-size: 1.8rem;">workspace_premium</span>',
+    '🥈': '<span class="material-icons-outlined" style="color:#94A3B8; font-size: 1.8rem;">workspace_premium</span>',
+    '🥉': '<span class="material-icons-outlined" style="color:#CD7C4A; font-size: 1.8rem;">workspace_premium</span>',
+    '📚': '<span class="material-icons-outlined" style="color:#8B5CF6; font-size: 1.8rem;">library_books</span>',
+  };
+  return badgeMap[icon] || icon;
+};
 
 let currentDateFrom = document.getElementById('dateFrom')?.value;
 let currentDateTo = document.getElementById('dateTo')?.value;
@@ -61,13 +70,13 @@ function bindControls() {
   document.getElementById('btnExcelExport')?.addEventListener('click', () => {
     const url = `/export/excel/?date_from=${currentDateFrom}&date_to=${currentDateTo}`;
     window.location.href = url;
-    showToast('📊', 'Downloading Excel...');
+    showToast('<span class="material-icons-outlined" style="color:var(--green)">analytics</span>', 'Downloading Excel...');
   });
 
   document.getElementById('btnPdfExport')?.addEventListener('click', () => {
     const url = `/export/pdf/?date_from=${currentDateFrom}&date_to=${currentDateTo}`;
     window.location.href = url;
-    showToast('📄', 'Downloading PDF...');
+    showToast('<span class="material-icons-outlined" style="color:var(--red)">description</span>', 'Downloading PDF...');
   });
 
   // Modal close
@@ -221,19 +230,19 @@ function renderNominations(noms) {
   if (!container) return;
 
   const roleConfig = {
-    student:  { label: '🎓 Top Student',  cls: 'students' },
-    lecturer: { label: '👨‍🏫 Top Lecturer', cls: 'lecturers' },
-    staff:    { label: '👔 Top Staff',     cls: 'staff' },
+    student:  { label: '<span class="material-icons-outlined" style="vertical-align: middle; margin-right: 4px; font-size: 1.15rem; color: var(--gold);">school</span> Top Student',  cls: 'students' },
+    lecturer: { label: '<span class="material-icons-outlined" style="vertical-align: middle; margin-right: 4px; font-size: 1.15rem; color: var(--gold);">person</span> Top Lecturer', cls: 'lecturers' },
+    staff:    { label: '<span class="material-icons-outlined" style="vertical-align: middle; margin-right: 4px; font-size: 1.15rem; color: var(--gold);">work</span> Top Staff',     cls: 'staff' },
   };
 
   container.innerHTML = Object.entries(roleConfig).map(([role, cfg]) => {
     const n = noms[role];
-    if (!n) return `<div class="nom-card ${cfg.cls}"><div class="nom-label">${cfg.label}</div><div class="empty-state"><div class="icon">📭</div><p>No data yet</p></div></div>`;
+    if (!n) return `<div class="nom-card ${cfg.cls}"><div class="nom-label">${cfg.label}</div><div class="empty-state"><div class="icon"><span class="material-icons-outlined" style="font-size: 2.2rem; color: var(--muted); display: block; margin-bottom: 8px;">inbox</span></div><p>No data yet</p></div></div>`;
     const { bg, text } = ROLE_COLORS[role];
     return `
       <div class="nom-card ${cfg.cls}">
         <div class="nom-label">${cfg.label}</div>
-        <div class="nom-trophy">🥇</div>
+        <div class="nom-trophy"><span class="material-icons-outlined" style="font-size: 1.8rem; color: var(--gold);">workspace_premium</span></div>
         <div class="nom-avatar-big" style="background:${bg};color:${text}">${n.initials}</div>
         <div class="nom-winner">${n.name}</div>
         <div class="nom-detail">${n.faculty}${n.title ? ' · ' + n.title : ''}</div>
@@ -250,7 +259,7 @@ function renderList(containerId, items, forceRole, showRoleTag = false, scoreKey
   if (!el) return;
 
   if (!items.length) {
-    el.innerHTML = `<div class="empty-state"><div class="icon">📭</div><p>No results found.</p></div>`;
+    el.innerHTML = `<div class="empty-state"><div class="icon"><span class="material-icons-outlined" style="font-size: 2.2rem; color: var(--muted); display: block; margin-bottom: 8px;">inbox</span></div><p>No results found.</p></div>`;
     return;
   }
 
@@ -307,7 +316,7 @@ function renderPodium(containerId, items, role) {
     return `
       <div class="podium-item ${cls[pos]}" data-id="${p.id}" data-role="${role}">
         <div class="podium-avatar" style="background:${bg};color:${text}">
-          ${cls[pos] === 'first' ? '<div class="podium-crown">👑</div>' : ''}
+          ${cls[pos] === 'first' ? '<div class="podium-crown"><span class="material-icons-outlined" style="font-size: 1.4rem; color: var(--gold);">emoji_events</span></div>' : ''}
           ${p.initials}
         </div>
         <div class="podium-name">${p.name}</div>
@@ -375,7 +384,7 @@ function renderFacultyBooks(faculties) {
   el.innerHTML = sorted.map((f, i) => `
     <div class="book-item">
       <div class="book-rank">${i + 1}</div>
-      <div class="book-icon" style="font-size:1rem">🏛️</div>
+      <div class="book-icon" style="display:flex; align-items:center;"><span class="material-icons-outlined" style="font-size: 1.1rem; color: var(--gold);">account_balance</span></div>
       <div class="book-info">
         <div class="book-title">${f.name}</div>
         <div class="book-author">${f.visitors} visitors</div>
@@ -404,7 +413,7 @@ function renderTopPerFaculty(topList) {
         </div>
         <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:.95rem;color:${text};flex-shrink:0">${t.visits}</div>
       </div>`;
-  }).join('') || '<div class="empty-state"><div class="icon">📭</div><p>No data yet</p></div>';
+  }).join('') || '<div class="empty-state"><div class="icon"><span class="material-icons-outlined" style="font-size: 2.2rem; color: var(--muted); display: block; margin-bottom: 8px;">inbox</span></div><p>No data yet</p></div>';
 }
 
 // ── MODAL ──
@@ -436,17 +445,17 @@ function renderModal(data, role) {
       <div class="modal-stats" style="margin-top:20px; display:flex; justify-content:center; gap:16px;">
         <div class="modal-stat"><strong style="color:${text}">${data.visits_total}</strong><span>Total Visits</span></div>
         <div class="modal-stat"><strong style="color:var(--purple)">${data.books_total}</strong><span>Total Books</span></div>
-        <div class="modal-stat"><strong style="color:var(--orange)">${data.streak}</strong><span>Day Streak 🔥</span></div>
+        <div class="modal-stat"><strong style="color:var(--orange)">${data.streak}</strong><span>Day Streak <span class="material-icons-outlined" style="vertical-align: middle; color: var(--orange); font-size: 1.1rem;">local_fire_department</span></span></div>
       </div>
 
       ${badges.length ? `
       <div class="modal-badges" style="margin-top:24px; text-align:left; padding:0 10px;">
-        <h4 style="margin-bottom:12px;font-size:.85rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;text-align:center;">🏆 Prestasi / Badges</h4>
+        <h4 style="margin-bottom:12px;font-size:.85rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;text-align:center;"><span class="material-icons-outlined" style="vertical-align: middle; color: var(--gold); font-size: 1.1rem; margin-right: 4px;">emoji_events</span> Prestasi / Badges</h4>
         <div style="display:flex; flex-direction:column; gap:10px;">
           ${badges.map(b => `
             <div style="display:flex; align-items:center; gap:12px; padding:12px; border-radius:10px; border:1px solid var(--border); background:rgba(47,49,133,0.04)">
               <div style="font-size:1.8rem; width:48px; height:48px; display:flex; align-items:center; justify-content:center; background:${b.image_url ? 'none' : b.color+'20'}; border-radius:50%;flex-shrink:0;">
-                ${b.image_url ? `<img src="${b.image_url}" alt="${b.name}" style="width:100%; height:100%; object-fit:contain;">` : b.icon}
+                ${b.image_url ? `<img src="${b.image_url}" alt="${b.name}" style="width:100%; height:100%; object-fit:contain;">` : getBadgeIconHtml(b.icon)}
               </div>
               <div style="flex:1;">
                 <div style="font-weight:700; color:var(--text); font-size:1rem; margin-bottom:2px;">${b.name}</div>
@@ -460,12 +469,12 @@ function renderModal(data, role) {
 
     <!-- Share Buttons -->
     <div class="modal-share" style="margin-top:20px; padding-top:20px; border-top:1px solid var(--border);">
-      <h4 style="margin-bottom:12px;font-size:.85rem;color:var(--muted);text-align:center;">📢 Share Pencapaianmu</h4>
+      <h4 style="margin-bottom:12px;font-size:.85rem;color:var(--muted);text-align:center;"><span class="material-icons-outlined" style="vertical-align: middle; color: var(--gold); font-size: 1.1rem; margin-right: 4px;">campaign</span> Share Pencapaianmu</h4>
       <div style="display:flex; justify-content:center; gap:8px; flex-wrap:wrap;">
-        <a href="https://twitter.com/intent/tweet?text=${shareText}&url=${shareUrl}" target="_blank" style="padding:8px 14px; border-radius:20px; background:#1DA1F2; color:#fff; text-decoration:none; font-size:.8rem; font-weight:700;">🐦 Twitter</a>
-        <a href="https://www.facebook.com/sharer/sharer.php?u=${shareUrl}&quote=${shareText}" target="_blank" style="padding:8px 14px; border-radius:20px; background:#1877F2; color:#fff; text-decoration:none; font-size:.8rem; font-weight:700;">📘 Facebook</a>
-        <a href="https://api.whatsapp.com/send?text=${shareText}%20${shareUrl}" target="_blank" style="padding:8px 14px; border-radius:20px; background:#25D366; color:#fff; text-decoration:none; font-size:.8rem; font-weight:700;">💬 WhatsApp</a>
-        <button onclick="downloadIGStory()" style="padding:8px 14px; border-radius:20px; background:linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888); color:#fff; border:none; cursor:pointer; font-size:.8rem; font-weight:700;">📸 IG Story</button>
+        <a href="https://twitter.com/intent/tweet?text=${shareText}&url=${shareUrl}" target="_blank" style="display:inline-flex; align-items:center; padding:8px 14px; border-radius:20px; background:#1DA1F2; color:#fff; text-decoration:none; font-size:.8rem; font-weight:700;"><span class="material-icons-outlined" style="font-size: 0.9rem; margin-right: 4px;">send</span> Twitter</a>
+        <a href="https://www.facebook.com/sharer/sharer.php?u=${shareUrl}&quote=${shareText}" target="_blank" style="display:inline-flex; align-items:center; padding:8px 14px; border-radius:20px; background:#1877F2; color:#fff; text-decoration:none; font-size:.8rem; font-weight:700;"><span class="material-icons-outlined" style="font-size: 0.9rem; margin-right: 4px;">facebook</span> Facebook</a>
+        <a href="https://api.whatsapp.com/send?text=${shareText}%20${shareUrl}" target="_blank" style="display:inline-flex; align-items:center; padding:8px 14px; border-radius:20px; background:#25D366; color:#fff; text-decoration:none; font-size:.8rem; font-weight:700;"><span class="material-icons-outlined" style="font-size: 0.9rem; margin-right: 4px;">chat</span> WhatsApp</a>
+        <button onclick="downloadIGStory()" style="display:inline-flex; align-items:center; padding:8px 14px; border-radius:20px; background:linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888); color:#fff; border:none; cursor:pointer; font-size:.8rem; font-weight:700;"><span class="material-icons-outlined" style="font-size: 0.9rem; margin-right: 4px;">photo_camera</span> IG Story</button>
       </div>
     </div>
   `;
@@ -513,10 +522,10 @@ function openPanduanModal() {
       
       <!-- Tab Menu Modal -->
       <div class="guide-tabs" style="display:flex; border-bottom:2px solid var(--border); margin-bottom:18px; gap:4px; overflow-x:auto; padding-bottom:2px;">
-        <button class="guide-tab-btn active" data-guide-tab="about" style="flex:1; padding:10px 6px; border:none; background:none; font-family:'Inter',sans-serif; font-size:0.85rem; font-weight:700; color:var(--gold); border-bottom:3px solid var(--gold); cursor:pointer; text-align:center; transition:all 0.2s; white-space:nowrap;">📚 Tentang</button>
-        <button class="guide-tab-btn" data-guide-tab="points" style="flex:1; padding:10px 6px; border:none; background:none; font-family:'Inter',sans-serif; font-size:0.85rem; font-weight:700; color:var(--muted); border-bottom:3px solid transparent; cursor:pointer; text-align:center; transition:all 0.2s; white-space:nowrap;">📈 Poin (XP)</button>
-        <button class="guide-tab-btn" data-guide-tab="badges" style="flex:1; padding:10px 6px; border:none; background:none; font-family:'Inter',sans-serif; font-size:0.85rem; font-weight:700; color:var(--muted); border-bottom:3px solid transparent; cursor:pointer; text-align:center; transition:all 0.2s; white-space:nowrap;">🏅 Badges</button>
-        <button class="guide-tab-btn" data-guide-tab="levels" style="flex:1; padding:10px 6px; border:none; background:none; font-family:'Inter',sans-serif; font-size:0.85rem; font-weight:700; color:var(--muted); border-bottom:3px solid transparent; cursor:pointer; text-align:center; transition:all 0.2s; white-space:nowrap;">👑 Levels</button>
+        <button class="guide-tab-btn active" data-guide-tab="about" style="flex:1; padding:10px 6px; border:none; background:none; font-family:'Inter',sans-serif; font-size:0.85rem; font-weight:700; color:var(--gold); border-bottom:3px solid var(--gold); cursor:pointer; text-align:center; transition:all 0.2s; white-space:nowrap;"><span class="material-icons-outlined" style="font-size:0.95rem; vertical-align:middle; margin-right:4px;">menu_book</span> Tentang</button>
+        <button class="guide-tab-btn" data-guide-tab="points" style="flex:1; padding:10px 6px; border:none; background:none; font-family:'Inter',sans-serif; font-size:0.85rem; font-weight:700; color:var(--muted); border-bottom:3px solid transparent; cursor:pointer; text-align:center; transition:all 0.2s; white-space:nowrap;"><span class="material-icons-outlined" style="font-size:0.95rem; vertical-align:middle; margin-right:4px;">trending_up</span> Poin (XP)</button>
+        <button class="guide-tab-btn" data-guide-tab="badges" style="flex:1; padding:10px 6px; border:none; background:none; font-family:'Inter',sans-serif; font-size:0.85rem; font-weight:700; color:var(--muted); border-bottom:3px solid transparent; cursor:pointer; text-align:center; transition:all 0.2s; white-space:nowrap;"><span class="material-icons-outlined" style="font-size:0.95rem; vertical-align:middle; margin-right:4px;">workspace_premium</span> Badges</button>
+        <button class="guide-tab-btn" data-guide-tab="levels" style="flex:1; padding:10px 6px; border:none; background:none; font-family:'Inter',sans-serif; font-size:0.85rem; font-weight:700; color:var(--muted); border-bottom:3px solid transparent; cursor:pointer; text-align:center; transition:all 0.2s; white-space:nowrap;"><span class="material-icons-outlined" style="font-size:0.95rem; vertical-align:middle; margin-right:4px;">military_tech</span> Levels</button>
       </div>
 
       <!-- Tab Content Modal -->
@@ -527,7 +536,7 @@ function openPanduanModal() {
             Selamat datang di <strong>LibraryRank</strong>, platform gamifikasi resmi Perpustakaan UMS! Platform ini dirancang khusus untuk mengapresiasi keaktifan kunjungan fisik, literasi, peminjaman buku, serta keikutsertaan event ilmiah dari para civitas akademika (Mahasiswa, Dosen, &amp; Tendik/Staff).
           </p>
           <div style="background:rgba(255,184,0,0.06); border-left:4px solid var(--gold); padding:12px; border-radius:4px; margin-top:14px; font-size:0.85rem; line-height:1.5; color:var(--text);">
-            <strong style="color:var(--gold); display:block; margin-bottom:4px; font-size:0.9rem;">🎯 Misi Utama Kami:</strong>
+            <strong style="color:var(--gold); display:block; margin-bottom:4px; font-size:0.9rem;"><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: middle; color: var(--gold); margin-right: 4px;">track_changes</span> Misi Utama Kami:</strong>
             Membangun atmosfer akademik yang kompetitif dan menyenangkan, serta memotivasi minat baca melalui perolehan poin prestasi, lencana kehormatan (badges), dan reward eksklusif perpustakaan.
           </div>
         </div>
@@ -538,7 +547,7 @@ function openPanduanModal() {
           <div style="display:flex; flex-direction:column; gap:10px;">
             <div style="display:flex; align-items:center; justify-content:space-between; padding:12px; border-radius:10px; border:1px solid var(--border); background:rgba(77,166,255,0.05);">
               <div style="display:flex; align-items:center; gap:10px;">
-                <span style="font-size:1.5rem;">🚶</span>
+                <span style="font-size:1.5rem; display:flex; align-items:center;"><span class="material-icons-outlined" style="font-size:1.6rem; color: var(--blue);">directions_walk</span></span>
                 <div>
                   <strong style="display:block; font-size:0.92rem; color:var(--text);">Kunjungan Fisik (Gate Scan)</strong>
                   <span style="font-size:0.78rem; color:var(--muted);">Terdeteksi otomatis saat memindai kartu di pintu masuk.</span>
@@ -549,7 +558,7 @@ function openPanduanModal() {
 
             <div style="display:flex; align-items:center; justify-content:space-between; padding:12px; border-radius:10px; border:1px solid var(--border); background:rgba(61,224,138,0.05);">
               <div style="display:flex; align-items:center; gap:10px;">
-                <span style="font-size:1.5rem;">📚</span>
+                <span style="font-size:1.5rem; display:flex; align-items:center;"><span class="material-icons-outlined" style="font-size:1.6rem; color: var(--green);">library_books</span></span>
                 <div>
                   <strong style="display:block; font-size:0.92rem; color:var(--text);">Peminjaman Buku (Sirkulasi)</strong>
                   <span style="font-size:0.78rem; color:var(--muted);">Dihitung per transaksi peminjaman buku koha yang sah.</span>
@@ -560,7 +569,7 @@ function openPanduanModal() {
 
             <div style="display:flex; align-items:center; justify-content:space-between; padding:12px; border-radius:10px; border:1px solid var(--border); background:rgba(255,145,77,0.05);">
               <div style="display:flex; align-items:center; gap:10px;">
-                <span style="font-size:1.5rem;">🎓</span>
+                <span style="font-size:1.5rem; display:flex; align-items:center;"><span class="material-icons-outlined" style="font-size:1.6rem; color: var(--orange);">school</span></span>
                 <div>
                   <strong style="display:block; font-size:0.92rem; color:var(--text);">Seminar &amp; Workshop Literasi</strong>
                   <span style="font-size:0.78rem; color:var(--muted);">Diberikan oleh admin pustakawan saat Anda mengikuti event perpustakaan.</span>
@@ -576,7 +585,7 @@ function openPanduanModal() {
           <p style="font-size:0.9rem; color:var(--muted); margin-bottom:14px;">Lencana kehormatan yang didapatkan secara otomatis jika memenuhi kriteria tertentu:</p>
           <div style="display:flex; flex-direction:column; gap:10px;">
             <div style="display:flex; align-items:center; gap:12px; padding:12px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.02);">
-              <div style="font-size:1.8rem; width:44px; height:44px; display:flex; align-items:center; justify-content:center; background:#bdc3c720; border-radius:50%; flex-shrink:0;">🥈</div>
+              <div style="font-size:1.8rem; width:44px; height:44px; display:flex; align-items:center; justify-content:center; background:#bdc3c720; border-radius:50%; flex-shrink:0;"><span class="material-icons-outlined" style="color:#94A3B8; font-size:1.8rem;">workspace_premium</span></div>
               <div>
                 <strong style="display:block; font-size:0.95rem; color:white; font-weight:700;">Weekly Warrior</strong>
                 <span style="font-size:0.8rem; color:var(--muted);">Melakukan kunjungan fisik ke perpustakaan minimal 3 kali dalam seminggu.</span>
@@ -584,7 +593,7 @@ function openPanduanModal() {
             </div>
 
             <div style="display:flex; align-items:center; gap:12px; padding:12px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.02);">
-              <div style="font-size:1.8rem; width:44px; height:44px; display:flex; align-items:center; justify-content:center; background:#9b59b620; border-radius:50%; flex-shrink:0;">📚</div>
+              <div style="font-size:1.8rem; width:44px; height:44px; display:flex; align-items:center; justify-content:center; background:#9b59b620; border-radius:50%; flex-shrink:0;"><span class="material-icons-outlined" style="color:#8B5CF6; font-size:1.8rem;">library_books</span></div>
               <div>
                 <strong style="display:block; font-size:0.95rem; color:white; font-weight:700;">Book Worm</strong>
                 <span style="font-size:0.8rem; color:var(--muted);">Meminjam lebih dari 5 buku dalam periode satu semester.</span>
@@ -592,7 +601,7 @@ function openPanduanModal() {
             </div>
 
             <div style="display:flex; align-items:center; gap:12px; padding:12px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.02);">
-              <div style="font-size:1.8rem; width:44px; height:44px; display:flex; align-items:center; justify-content:center; background:#f1c40f20; border-radius:50%; flex-shrink:0;">🥇</div>
+              <div style="font-size:1.8rem; width:44px; height:44px; display:flex; align-items:center; justify-content:center; background:#f1c40f20; border-radius:50%; flex-shrink:0;"><span class="material-icons-outlined" style="color:#FFB800; font-size:1.8rem;">workspace_premium</span></div>
               <div>
                 <strong style="display:block; font-size:0.95rem; color:white; font-weight:700;">Library Legend</strong>
                 <span style="font-size:0.8rem; color:var(--muted);">Menembus jajaran prestisius Top 10 Leaderboard pada bulan berjalan.</span>
@@ -610,23 +619,23 @@ function openPanduanModal() {
               <div style="font-size:0.75rem; color:var(--muted); margin-top:2px;">0 - 100 XP</div>
             </div>
             <div style="padding:10px; border-radius:8px; border:1px solid var(--border); text-align:center; background:rgba(255,255,255,0.02);">
-              <div style="font-weight:bold; font-size:0.9rem; color:#3498db;">📖 Pembaca</div>
+              <div style="font-weight:bold; font-size:0.9rem; color:#3498db; display:flex; align-items:center; justify-content:center; gap:4px;"><span class="material-icons-outlined" style="font-size:0.95rem; color:#3498db;">auto_stories</span> Pembaca</div>
               <div style="font-size:0.75rem; color:var(--muted); margin-top:2px;">101 - 300 XP</div>
             </div>
             <div style="padding:10px; border-radius:8px; border:1px solid var(--border); text-align:center; background:rgba(255,255,255,0.02);">
-              <div style="font-weight:bold; font-size:0.9rem; color:#2ecc71;">📝 Pelajar</div>
+              <div style="font-weight:bold; font-size:0.9rem; color:#2ecc71; display:flex; align-items:center; justify-content:center; gap:4px;"><span class="material-icons-outlined" style="font-size:0.95rem; color:#2ecc71;">edit</span> Pelajar</div>
               <div style="font-size:0.75rem; color:var(--muted); margin-top:2px;">301 - 700 XP</div>
             </div>
             <div style="padding:10px; border-radius:8px; border:1px solid var(--border); text-align:center; background:rgba(255,255,255,0.02);">
-              <div style="font-weight:bold; font-size:0.9rem; color:#9b59b6;">🔬 Peneliti</div>
+              <div style="font-weight:bold; font-size:0.9rem; color:#9b59b6; display:flex; align-items:center; justify-content:center; gap:4px;"><span class="material-icons-outlined" style="font-size:0.95rem; color:#9b59b6;">science</span> Peneliti</div>
               <div style="font-size:0.75rem; color:var(--muted); margin-top:2px;">701 - 1500 XP</div>
             </div>
             <div style="padding:10px; border-radius:8px; border:1px solid var(--border); text-align:center; background:rgba(255,255,255,0.02);">
-              <div style="font-weight:bold; font-size:0.9rem; color:#e67e22;">🎓 Cendekia</div>
+              <div style="font-weight:bold; font-size:0.9rem; color:#e67e22; display:flex; align-items:center; justify-content:center; gap:4px;"><span class="material-icons-outlined" style="font-size:0.95rem; color:#e67e22;">school</span> Cendekia</div>
               <div style="font-size:0.75rem; color:var(--muted); margin-top:2px;">1501 - 3000 XP</div>
             </div>
             <div style="padding:10px; border-radius:8px; border:1px solid var(--border); text-align:center; background:rgba(255,255,255,0.02);">
-              <div style="font-weight:bold; font-size:0.9rem; color:#f1c40f;">👑 Legenda Perpus</div>
+              <div style="font-weight:bold; font-size:0.9rem; color:#f1c40f; display:flex; align-items:center; justify-content:center; gap:4px;"><span class="material-icons-outlined" style="font-size:0.95rem; color:#f1c40f;">workspace_premium</span> Legenda Perpus</div>
               <div style="font-size:0.75rem; color:var(--muted); margin-top:2px;">3001+ XP</div>
             </div>
           </div>
@@ -683,7 +692,7 @@ function openRedeemModal(rewardId, rewardName, rewardCost, rewardStock) {
       </h2>
       
       <div style="background:rgba(255,184,0,0.06); padding:14px; border-radius:12px; border:1px solid rgba(255,184,0,0.15); margin-bottom:18px;">
-        <h4 style="margin:0 0 4px 0; font-size:0.95rem; color:var(--text); font-weight:700;">🎁 ${rewardName}</h4>
+        <h4 style="margin:0 0 4px 0; font-size:0.95rem; color:var(--text); font-weight:700; display:flex; align-items:center; gap:4px;"><span class="material-icons-outlined" style="color:var(--gold); font-size:1.15rem;">redeem</span> ${rewardName}</h4>
         <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.82rem; color:var(--muted); margin-top:8px;">
           <span>Biaya Penukaran: <strong style="color:var(--gold); font-size:0.9rem;">${rewardCost} XP</strong></span>
           <span>Tersedia: <strong style="color:var(--text);">${rewardStock} unit</strong></span>
@@ -755,9 +764,12 @@ function openRedeemModal(rewardId, rewardName, rewardCost, rewardStock) {
     const stepContainer = document.getElementById('redeemStepContainer');
     stepContainer.innerHTML = `
       <form id="otpVerifyForm">
-        <div style="background:rgba(77,166,255,0.06); padding:12px; border-radius:10px; border:1px solid rgba(77,166,255,0.15); margin-bottom:16px; font-size:0.82rem; line-height:1.5; color:var(--text);">
-          📢 Kode verifikasi OTP telah dikirim ke email kampus Anda:<br>
-          <strong style="color:var(--blue);">${maskedEmail}</strong>
+        <div style="background:rgba(77,166,255,0.06); padding:12px; border-radius:10px; border:1px solid rgba(77,166,255,0.15); margin-bottom:16px; font-size:0.82rem; line-height:1.5; color:var(--text); display:flex; align-items:flex-start; gap:8px;">
+          <span class="material-icons-outlined" style="font-size: 1.2rem; color: var(--blue); margin-top:2px;">campaign</span>
+          <div>
+            Kode verifikasi OTP telah dikirim ke email kampus Anda:<br>
+            <strong style="color:var(--blue);">${maskedEmail}</strong>
+          </div>
         </div>
 
         <label style="display:block; font-size:0.82rem; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">Masukkan 6-Digit OTP:</label>
@@ -829,11 +841,11 @@ function openRedeemModal(rewardId, rewardName, rewardCost, rewardStock) {
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${claimCode}`;
     
     // Trigger toast success
-    showToast('🎉', 'Penukaran poin berhasil!');
+    showToast('<span class="material-icons-outlined" style="color:var(--green)">celebration</span>', 'Penukaran poin berhasil!');
 
     stepContainer.innerHTML = `
       <div style="text-align:center; padding:10px 0;">
-        <div style="font-size:3rem; color:var(--green); margin-bottom:10px; animation: bounce 1.5s ease-in-out infinite;">🎉</div>
+        <div style="font-size:3rem; color:var(--green); margin-bottom:10px;"><span class="material-icons-outlined" style="font-size: 3rem; color: var(--green); animation: bounce 1.5s ease-in-out infinite;">celebration</span></div>
         <h3 style="font-size:1.2rem; font-weight:800; color:var(--text); margin-bottom:6px;">Penukaran Berhasil!</h3>
         <p style="font-size:0.85rem; color:var(--muted); margin-bottom:18px;">
           Poin Anda telah berhasil dipotong sebanyak <strong style="color:var(--gold);">${cost} XP</strong>. Sisa poin Anda sekarang: <strong>${remainingPoints} XP</strong>.
@@ -883,7 +895,7 @@ function animateCounter(id, target) {
 
 function showToast(icon, msg, duration = 3000) {
   const el = document.getElementById('toast');
-  document.getElementById('toastIcon').textContent = icon;
+  document.getElementById('toastIcon').innerHTML = icon;
   document.getElementById('toastMsg').textContent = msg;
   el.classList.add('show');
   setTimeout(() => el.classList.remove('show'), duration);

@@ -438,3 +438,43 @@ class RedemptionClaim(models.Model):
         return f"{self.code} — {self.member.name} ({self.status})"
 
 
+class Seminar(models.Model):
+    title = models.CharField(max_length=200, help_text="Judul Seminar")
+    speaker = models.CharField(max_length=100, help_text="Pembicara/Narasumber")
+    description = models.TextField(blank=True, null=True, help_text="Deskripsi Singkat Seminar")
+    date = models.DateTimeField(help_text="Tanggal & Waktu Seminar")
+    registration_open = models.DateTimeField(help_text="Tanggal Dibuka Pendaftaran")
+    registration_close = models.DateTimeField(help_text="Tanggal Ditutup Pendaftaran")
+    points_register = models.IntegerField(default=2, help_text="Poin untuk mendaftar")
+    points_attend = models.IntegerField(default=15, help_text="Poin untuk kehadiran")
+    claim_code = models.CharField(max_length=50, unique=True, help_text="Kode Unik Klaim Kehadiran (misal: UMS-SEM-XYZ)")
+    claim_code_active = models.BooleanField(default=False, help_text="Apakah klaim kehadiran sedang aktif")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-date']
+
+    def __str__(self):
+        return f"{self.title} ({self.date.strftime('%d %b %Y')})"
+
+
+class SeminarRegistration(models.Model):
+    STATUS_CHOICES = [
+        ('registered', 'Terdaftar'),
+        ('attended', 'Hadir / Diklaim'),
+    ]
+    seminar = models.ForeignKey(Seminar, on_delete=models.CASCADE, related_name='registrations')
+    member_id = models.CharField(max_length=50, db_index=True, help_text="NIM / Cardnumber")
+    email = models.EmailField(max_length=254, help_text="Email Mahasiswa saat mendaftar")
+    registered_at = models.DateTimeField(auto_now_add=True)
+    attended_at = models.DateTimeField(null=True, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='registered')
+
+    class Meta:
+        ordering = ['-registered_at']
+        unique_together = ('seminar', 'member_id')
+
+    def __str__(self):
+        return f"{self.member_id} - {self.seminar.title} ({self.status})"
+
+

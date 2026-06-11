@@ -6,6 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dev Login — LibraryRank</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
 <style>
   :root{--bg:#0d0f14;--surface:#161923;--surface2:#1e2330;--border:rgba(255,255,255,.07);--gold:#f5c842;--text:#eef2ff;--muted:#8892aa;--red:#ff5c5c;}
   *{box-sizing:border-box;margin:0;padding:0;}
@@ -26,8 +27,16 @@
 </head>
 <body>
 <div class="card">
-  <div class="logo">📚 LibraryRank</div>
-  <div class="dev-badge"><span>⚠️ Local Dev Mode</span></div>
+  <div class="logo" style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+    <span class="material-icons-outlined" style="font-size: 1.8rem;">menu_book</span>
+    LibraryRank
+  </div>
+  <div class="dev-badge">
+    <span style="display: inline-flex; align-items: center; gap: 4px;">
+      <span class="material-icons-outlined" style="font-size: 0.95rem;">warning</span>
+      Local Dev Mode
+    </span>
+  </div>
 
   <form method="post">
     {% csrf_token %}

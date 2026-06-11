@@ -4,7 +4,7 @@ from django.views.decorators.cache import cache_page
 from datetime import date, timedelta
 import datetime
 import json
-from .models import Member, Reward, PointTransaction, RedemptionClaim
+from .models import Member, Reward, PointTransaction, RedemptionClaim, Seminar, SeminarRegistration
 # Ditch models entirely for leaderboard APIs
 from .demo_data import DEMO_DATA
 from .koha_utils import get_live_members, get_live_member_detail, get_live_faculties_stats, get_live_books_stats, get_live_daily_visits
@@ -33,6 +33,43 @@ def _use_demo():
     except Exception:
         return True
 
+
+def cache_page_server_only(timeout):
+    def decorator(view_func):
+        def _wrapped_view(request, *args, **kwargs):
+            import hashlib
+            # Sort query parameters to ensure key consistency
+            get_params = sorted(request.GET.items())
+            get_str = "&".join(f"{k}={v}" for k, v in get_params)
+            key_parts = [request.path, get_str]
+            if args:
+                key_parts.append(str(args))
+            if kwargs:
+                key_parts.append(str(kwargs))
+            
+            key = "srv_cache_" + hashlib.md5(":".join(key_parts).encode('utf-8')).hexdigest()
+            
+            cached_data = cache.get(key)
+            if cached_data is not None:
+                response = JsonResponse(cached_data)
+                response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+                return response
+                
+            response = view_func(request, *args, **kwargs)
+            if isinstance(response, JsonResponse):
+                try:
+                    data = json.loads(response.content)
+                    cache.set(key, data, timeout)
+                except Exception:
+                    pass
+            response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+            return response
+        return _wrapped_view
+    return decorator
+
+
+from django.core.cache import cache
+
 def index(request):
     date_from, date_to = get_date_range(request)
     rewards = Reward.objects.filter(is_active=True)
@@ -43,10 +80,43 @@ def index(request):
         'rewards':   rewards,
     })
 
-@cache_page(60 * 10)  # 10 menit
+@cache_page_server_only(60 * 10)
 def api_overview(request):
     if _use_demo():
-        overview = dict(DEMO_DATA['overview'])
+        from django.db.models import Sum
+        import copy
+        overview = copy.deepcopy(DEMO_DATA['overview'])
+        
+        # Add local transactions to demo leaderboard members
+        for m in overview['leaderboard']:
+            local_pt = PointTransaction.objects.filter(cardnumber=m['id']).aggregate(total=Sum('amount'))['total'] or 0
+            m['visits'] = m['visits'] + local_pt # visits is used as total points in JS overview
+            m['total_p'] = m['visits']
+            
+            # Update level if exists
+            if 'level' in m:
+                m['level']['current_xp'] = m['visits']
+                try:
+                    from .models import LevelTier
+                    tiers = list(LevelTier.objects.all().order_by('min_xp'))
+                    if tiers:
+                        for tier in tiers:
+                            if tier.max_xp is None or m['visits'] <= tier.max_xp:
+                                denom = max(1, (tier.max_xp - tier.min_xp) if tier.max_xp else 1)
+                                m['level']['name'] = tier.name
+                                m['level']['level_num'] = tier.level_num
+                                m['level']['color'] = tier.color
+                                m['level']['progress_perc'] = min(100, int(((m['visits'] - tier.min_xp) / denom) * 100))
+                                m['level']['max_xp'] = tier.max_xp if tier.max_xp else m['visits']
+                                break
+                except Exception:
+                    pass
+                    
+        # Re-sort and rank
+        overview['leaderboard'].sort(key=lambda x: x['visits'], reverse=True)
+        for i, m in enumerate(overview['leaderboard']):
+            m['rank'] = i + 1
+            
         overview['daily_visits'] = [540, 610, 580, 590, 520, 240, 0]
         return JsonResponse(overview)
     
@@ -91,9 +161,20 @@ def api_overview(request):
         }
     })
 
-@cache_page(60 * 10)  # 10 menit
+@cache_page_server_only(60 * 10)
 def api_role_leaderboard(request, role):
-    if _use_demo(): return JsonResponse(DEMO_DATA.get(f'role_{role}', {'leaderboard': []}))
+    if _use_demo():
+        from django.db.models import Sum
+        import copy
+        role_data = copy.deepcopy(DEMO_DATA.get(f'role_{role}', {'leaderboard': []}))
+        for m in role_data['leaderboard']:
+            local_pt = PointTransaction.objects.filter(cardnumber=m['id']).aggregate(total=Sum('amount'))['total'] or 0
+            m['visits'] = m['visits'] + local_pt
+            m['total_p'] = m['visits']
+        role_data['leaderboard'].sort(key=lambda x: x['visits'], reverse=True)
+        for i, m in enumerate(role_data['leaderboard']):
+            m['rank'] = i + 1
+        return JsonResponse(role_data)
     date_from, date_to = get_date_range(request)
     q = request.GET.get('q', '').strip()
     
@@ -105,7 +186,7 @@ def api_role_leaderboard(request, role):
         
     return JsonResponse({'leaderboard': role_members})
 
-@cache_page(60 * 10)  # 10 menit
+@cache_page_server_only(60 * 10)
 def api_books(request):
     if _use_demo(): return JsonResponse(DEMO_DATA['books'])
     date_from, date_to = get_date_range(request)
@@ -121,7 +202,7 @@ def api_books(request):
 
     return JsonResponse({'books': books, 'borrowers': borrowers})
 
-@cache_page(60 * 10)  # 10 menit
+@cache_page_server_only(60 * 10)
 def api_faculties(request):
     if _use_demo(): return JsonResponse(DEMO_DATA['faculties'])
     date_from, date_to = get_date_range(request)
@@ -145,7 +226,7 @@ def api_faculties(request):
     top_per_faculty.sort(key=lambda x: x['visits'], reverse=True)
     return JsonResponse({'faculties': faculties, 'top_per_faculty': top_per_faculty})
 
-@cache_page(60) # lower cache for detail
+@cache_page_server_only(60)
 def api_member_detail(request, member_id):
     if _use_demo(): 
         all_p = (DEMO_DATA['overview']['leaderboard'] + DEMO_DATA.get('role_student', {}).get('leaderboard', []))
@@ -164,7 +245,7 @@ def api_member_detail(request, member_id):
         return JsonResponse({'error': 'Not found'}, status=404)
     return JsonResponse(detail)
 
-@cache_page(60 * 10)  # 10 menit
+@cache_page_server_only(60 * 10)
 def api_pemustaka_teraktif(request):
     if _use_demo():
         from .demo_data import _STUDENTS, _LECTURERS, _STAFF, _ALL
@@ -490,3 +571,253 @@ Team UMSLibrary
         })
     except Exception as e:
         return JsonResponse({'success': False, 'error': f'Terjadi kesalahan saat memproses penukaran: {str(e)}'}, status=500)
+
+
+def seminar_page(request):
+    """
+    Renders the main seminar page template.
+    """
+    return render(request, 'leaderboard/seminar.html')
+
+
+def api_seminar_list(request):
+    """
+    Returns a list of active seminars, formatted for the UI.
+    Includes student registration & claim status if member_id is provided.
+    """
+    now = timezone.now()
+    member_id = request.GET.get('member_id', '').strip().upper()
+    
+    # Show seminars within the last 30 days and in the future
+    recent_date = now - timedelta(days=30)
+    seminars = Seminar.objects.filter(date__gte=recent_date).order_by('date')
+    
+    registration_map = {}
+    if member_id:
+        regs = SeminarRegistration.objects.filter(member_id=member_id)
+        for r in regs:
+            registration_map[r.seminar_id] = r
+            
+    seminar_list = []
+    for sem in seminars:
+        is_open = sem.registration_open <= now <= sem.registration_close
+        is_upcoming = now < sem.registration_open
+        is_closed = now > sem.registration_close
+        
+        reg_status = 'not_registered'
+        if sem.id in registration_map:
+            reg_status = registration_map[sem.id].status # 'registered' or 'attended'
+            
+        seminar_list.append({
+            'id': sem.id,
+            'title': sem.title,
+            'speaker': sem.speaker,
+            'description': sem.description,
+            'date': sem.date.isoformat(),
+            'date_formatted': sem.date.strftime('%d %B %Y %H:%M'),
+            'points_register': sem.points_register,
+            'points_attend': sem.points_attend,
+            'is_open': is_open,
+            'is_upcoming': is_upcoming,
+            'is_closed': is_closed,
+            'claim_code_active': sem.claim_code_active,
+            'reg_status': reg_status,
+        })
+        
+    return JsonResponse({'success': True, 'seminars': seminar_list})
+
+
+@csrf_exempt
+def api_register_seminar(request):
+    """
+    Registers a student to a seminar immediately without OTP,
+    giving the points_register instantly.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Method not allowed'}, status=405)
+        
+    try:
+        data = json.loads(request.body) if request.body else request.POST
+    except Exception:
+        data = request.POST
+        
+    member_id = data.get('member_id', '').strip().upper()
+    email = data.get('email', '').strip().lower()
+    seminar_id = data.get('seminar_id')
+    
+    if not member_id or not email or not seminar_id:
+        return JsonResponse({'success': False, 'error': 'NIM, Email, dan ID Seminar harus diisi.'}, status=400)
+        
+    # Validate member exists in the local database
+    member = Member.objects.filter(member_id=member_id).first()
+    if not member:
+        return JsonResponse({'success': False, 'error': 'NIM Anda tidak terdaftar di database perpustakaan.'}, status=404)
+        
+    # Find seminar
+    seminar = Seminar.objects.filter(id=seminar_id).first()
+    if not seminar:
+        return JsonResponse({'success': False, 'error': 'Seminar tidak ditemukan.'}, status=404)
+        
+    now = timezone.now()
+    if now < seminar.registration_open:
+        return JsonResponse({'success': False, 'error': f"Pendaftaran belum dibuka. Dibuka tanggal {seminar.registration_open.strftime('%d %B %Y %H:%M')}."}, status=400)
+    if now > seminar.registration_close:
+        return JsonResponse({'success': False, 'error': 'Pendaftaran seminar sudah ditutup.'}, status=400)
+        
+    # Check duplicate
+    existing_reg = SeminarRegistration.objects.filter(seminar=seminar, member_id=member_id).first()
+    if existing_reg:
+        return JsonResponse({'success': False, 'error': 'Anda sudah terdaftar untuk seminar ini.'}, status=400)
+        
+    # Process registration in transaction
+    from django.db import transaction
+    try:
+        with transaction.atomic():
+            SeminarRegistration.objects.create(
+                seminar=seminar,
+                member_id=member_id,
+                email=email,
+                status='registered'
+            )
+            PointTransaction.objects.create(
+                cardnumber=member_id,
+                amount=seminar.points_register,
+                transaction_type='seminar',
+                description=f"Pendaftaran Seminar: {seminar.title}"
+            )
+            
+        # Send confirmation email (fails silently)
+        try:
+            from django.core.mail import send_mail
+            from django.conf import settings
+            subject = f"[UMSLibrary] Konfirmasi Pendaftaran Seminar - {seminar.title}"
+            message = f"""Halo {member.name},
+
+Pendaftaran Anda untuk seminar berikut telah berhasil diproses:
+
+📌 Judul Seminar : {seminar.title}
+🎙️ Pembicara     : {seminar.speaker}
+📅 Tanggal/Waktu : {seminar.date.strftime('%d %B %Y %H:%M')}
+🎁 Poin Terkumpul: +{seminar.points_register} XP (Pendaftaran)
+
+Jangan lupa hadir pada hari H. Di akhir seminar, Anda dapat mengklaim poin kehadiran sebesar +{seminar.points_attend} XP dengan memasukkan Kode Unik yang dibagikan oleh panitia.
+
+Salam Hangat,
+Team UMSLibrary
+"""
+            send_mail(
+                subject,
+                message,
+                settings.DEFAULT_FROM_EMAIL or 'noreply@ums.ac.id',
+                [email],
+                fail_silently=True
+            )
+        except Exception:
+            pass
+            
+        # Clear cache
+        from django.core.cache import cache
+        cache.clear()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f"Pendaftaran berhasil! Anda mendapatkan +{seminar.points_register} XP.",
+            'points_earned': seminar.points_register
+        })
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': f"Gagal mendaftar: {str(e)}"}, status=500)
+
+
+@csrf_exempt
+def api_claim_seminar_attendance(request):
+    """
+    Claims attendance for a seminar using the claim code,
+    giving the points_attend instantly.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Method not allowed'}, status=405)
+        
+    try:
+        data = json.loads(request.body) if request.body else request.POST
+    except Exception:
+        data = request.POST
+        
+    member_id = data.get('member_id', '').strip().upper()
+    seminar_id = data.get('seminar_id')
+    claim_code = data.get('claim_code', '').strip().upper()
+    
+    if not member_id or not seminar_id or not claim_code:
+        return JsonResponse({'success': False, 'error': 'NIM, ID Seminar, dan Kode Klaim harus diisi.'}, status=400)
+        
+    # Check registration exists
+    reg = SeminarRegistration.objects.filter(seminar_id=seminar_id, member_id=member_id).first()
+    if not reg:
+        return JsonResponse({'success': False, 'error': 'Anda belum terdaftar untuk seminar ini. Anda harus mendaftar terlebih dahulu.'}, status=400)
+        
+    if reg.status == 'attended':
+        return JsonResponse({'success': False, 'error': 'Anda sudah mengklaim poin kehadiran untuk seminar ini.'}, status=400)
+        
+    seminar = reg.seminar
+    
+    # Check active & code
+    if not seminar.claim_code_active:
+        return JsonResponse({'success': False, 'error': 'Klaim kehadiran untuk seminar ini belum diaktifkan oleh panitia.'}, status=400)
+        
+    if seminar.claim_code.upper() != claim_code:
+        return JsonResponse({'success': False, 'error': 'Kode klaim yang dimasukkan salah.'}, status=400)
+        
+    # Claim points in transaction
+    from django.db import transaction
+    try:
+        with transaction.atomic():
+            reg.status = 'attended'
+            reg.attended_at = timezone.now()
+            reg.save()
+            
+            PointTransaction.objects.create(
+                cardnumber=member_id,
+                amount=seminar.points_attend,
+                transaction_type='seminar',
+                description=f"Kehadiran Seminar: {seminar.title}"
+            )
+            
+        # Send confirmation email (fails silently)
+        try:
+            from django.core.mail import send_mail
+            from django.conf import settings
+            member = Member.objects.filter(member_id=member_id).first()
+            subject = f"[UMSLibrary] Konfirmasi Kehadiran Seminar Berhasil - {seminar.title}"
+            message = f"""Halo {member.name if member else member_id},
+
+Selamat! Konfirmasi kehadiran Anda untuk seminar berikut telah berhasil diproses:
+
+📌 Judul Seminar : {seminar.title}
+📅 Tanggal/Waktu : {seminar.date.strftime('%d %B %Y %H:%M')}
+🎁 Poin Tambahan : +{seminar.points_attend} XP (Kehadiran)
+
+Terima kasih telah berpartisipasi dalam kegiatan UMSLibrary!
+
+Salam Hangat,
+Team UMSLibrary
+"""
+            send_mail(
+                subject,
+                message,
+                settings.DEFAULT_FROM_EMAIL or 'noreply@ums.ac.id',
+                [reg.email],
+                fail_silently=True
+            )
+        except Exception:
+            pass
+            
+        # Clear cache
+        from django.core.cache import cache
+        cache.clear()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f"Klaim kehadiran berhasil! Anda mendapatkan +{seminar.points_attend} XP.",
+            'points_earned': seminar.points_attend
+        })
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': f"Gagal mengklaim kehadiran: {str(e)}"}, status=500)

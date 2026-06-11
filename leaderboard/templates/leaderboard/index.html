@@ -25,8 +25,7 @@
   <div style="display:flex; align-items:center; justify-content:space-between; padding: 0 20px 10px;">
     <div class="section-title" style="margin: 0; font-size: 1.15rem;"><span
         class="material-icons-outlined">redeem</span> Merchandise Reward Perpustakaan</div>
-    <span style="font-size:0.75rem; color:#868275; font-style:italic; opacity:0.85;">⚠️ Gambar hanya pemanis, bisa
-      berbeda dengan produk aslinya</span>
+    <span style="font-size:0.75rem; color:#868275; font-style:italic; opacity:0.85; display:flex; align-items:center; gap:4px;"><span class="material-icons-outlined" style="font-size:0.95rem; color:var(--gold);">info</span> Gambar hanya pemanis, bisa berbeda dengan produk aslinya</span>
   </div>
 
   <div style="position:relative; overflow:hidden;">
@@ -46,7 +45,7 @@
             onerror="this.src='https://placehold.co/180x130/2f3185/ffffff?text={{ reward.name|urlencode }}';">
         {% endif %}
         <h4 style="font-size:0.88rem; margin:0 0 4px; text-align:center; color:white; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:100%;">{{ reward.name }}</h4>
-        <span style="color:var(--gold); font-size:0.78rem; font-weight:bold;">✨ {{ reward.points_cost }} XP</span>
+        <span style="color:var(--gold); font-size:0.78rem; font-weight:bold; display:flex; align-items:center; gap:3px;"><span class="material-icons-outlined" style="font-size:0.95rem;">stars</span> {{ reward.points_cost }} XP</span>
         <span style="color:#868275; font-size:0.7rem; margin-top:2px;">Stok: {{ reward.stock }}</span>
       </div>
       {% empty %}
@@ -245,11 +244,11 @@
       Faculty</div>
     <div class="two-col">
       <div class="card-block">
-        <h3>🔖 Books Borrowed per Faculty</h3>
+        <h3 style="display:flex; align-items:center; gap:6px;"><span class="material-icons-outlined" style="color:var(--green);">bookmark</span> Books Borrowed per Faculty</h3>
         <div id="facultyBooks"></div>
       </div>
       <div class="card-block">
-        <h3>🙋 Top Student per Faculty</h3>
+        <h3 style="display:flex; align-items:center; gap:6px;"><span class="material-icons-outlined" style="color:var(--purple);">person</span> Top Student per Faculty</h3>
         <div id="facultyTopStudents"></div>
       </div>
     </div>

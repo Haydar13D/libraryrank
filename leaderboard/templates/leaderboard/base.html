@@ -6,10 +6,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>LibraryRank — UMSLibrary Leaderboard</title>
+  <link rel="icon" type="image/png" href="{% static 'img/UMS Lib Polos (1).png' %}">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
-  <link rel="stylesheet" href="{% static 'css/main.css' %}?v=8">
+  <link rel="stylesheet" href="{% static 'css/main.css' %}?v=9">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
     if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
@@ -41,6 +42,12 @@
 
     <nav class="header-nav">
       <div class="nav-item">
+        <a href="/" class="nav-link {% if request.path == '/' %}active{% endif %}">LEADERBOARD</a>
+      </div>
+      <div class="nav-item">
+        <a href="/seminar/" class="nav-link {% if request.path == '/seminar/' %}active{% endif %}">SEMINAR</a>
+      </div>
+      <div class="nav-item">
         <a href="#" class="nav-link" id="btnPanduan">PANDUAN</a>
       </div>
     </nav>
@@ -50,8 +57,8 @@
         <span class="material-icons-outlined" id="themeIcon" style="font-size:1.2rem;">dark_mode</span>
       </button>
       <span class="live-badge"><span class="live-dot"></span>Live</span>
-      <span class="demo-badge">🧪 Demo Mode</span>
-      <a href="/admin/" class="btn-admin">👑 Admin Login</a>
+      <span class="demo-badge" style="display: flex; align-items: center; gap: 4px;"><span class="material-icons-outlined" style="font-size:1rem; color:var(--gold);">science</span> Demo Mode</span>
+      <a href="/admin/" class="btn-admin" style="display: flex; align-items: center; gap: 6px;"><span class="material-icons-outlined" style="font-size:0.95rem;">admin_panel_settings</span> Admin Login</a>
     </div>
   </header>
 
@@ -67,7 +74,7 @@
 
   <!-- TOAST -->
   <div class="toast" id="toast">
-    <span id="toastIcon">✅</span>
+    <span id="toastIcon"><span class="material-icons-outlined" style="color:var(--green)">check_circle</span></span>
     <span id="toastMsg">Done!</span>
   </div>
 

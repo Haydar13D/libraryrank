@@ -1,6 +1,6 @@
 from django.contrib import admin
 from unfold.admin import ModelAdmin
-from .models import Member, Faculty, Book, LevelTier, BadgeRule, PointPolicy, SystemLog, Reward, PointTransaction, RedemptionClaim
+from .models import Member, Faculty, Book, LevelTier, BadgeRule, PointPolicy, SystemLog, Reward, PointTransaction, RedemptionClaim, Seminar, SeminarRegistration
 
 # Visit and BorrowRecord models are no longer managed by Django ORM!
 # The entire architecture has shifted to Live Koha Read-Only via koha_utils.py
@@ -102,3 +102,62 @@ class RedemptionClaimAdmin(ModelAdmin):
         from django.utils import timezone
         updated = queryset.update(status='claimed', claimed_at=timezone.now())
         self.message_user(request, f"{updated} kupon berhasil ditandai sebagai sudah diambil.")
+
+
+@admin.register(Seminar)
+class SeminarAdmin(ModelAdmin):
+    list_display = ('title', 'speaker', 'date', 'points_register', 'points_attend', 'claim_code', 'claim_code_active')
+    list_filter = ('claim_code_active', 'date')
+    search_fields = ('title', 'speaker', 'claim_code')
+    actions = ['activate_claim_code', 'deactivate_claim_code']
+
+    @admin.action(description="Aktifkan Klaim Kode Kehadiran")
+    def activate_claim_code(self, request, queryset):
+        updated = queryset.update(claim_code_active=True)
+        self.message_user(request, f"{updated} seminar berhasil diaktifkan klaim kodenya.")
+
+    @admin.action(description="Nonaktifkan Klaim Kode Kehadiran")
+    def deactivate_claim_code(self, request, queryset):
+        updated = queryset.update(claim_code_active=False)
+        self.message_user(request, f"{updated} seminar berhasil dinonaktifkan klaim kodenya.")
+
+
+@admin.register(SeminarRegistration)
+class SeminarRegistrationAdmin(ModelAdmin):
+    list_display = ('member_id', 'get_member_name', 'seminar', 'email', 'registered_at', 'attended_at', 'status')
+    list_filter = ('status', 'seminar')
+    search_fields = ('member_id', 'email', 'seminar__title')
+    actions = ['mark_as_attended']
+
+    def get_member_name(self, obj):
+        member = Member.objects.filter(member_id=obj.member_id).first()
+        return member.name if member else 'Tidak Terdaftar'
+    get_member_name.short_description = 'Nama Anggota'
+
+    @admin.action(description="Tandai peserta terpilih sebagai Hadir")
+    def mark_as_attended(self, request, queryset):
+        from django.utils import timezone
+        from django.db import transaction
+        from leaderboard.models import PointTransaction
+        
+        count = 0
+        for reg in queryset.filter(status='registered'):
+            with transaction.atomic():
+                reg.status = 'attended'
+                reg.attended_at = timezone.now()
+                reg.save()
+                
+                # Give points
+                PointTransaction.objects.create(
+                    cardnumber=reg.member_id,
+                    amount=reg.seminar.points_attend,
+                    transaction_type='seminar',
+                    description=f"Kehadiran Seminar (Manual Admin): {reg.seminar.title}"
+                )
+                count += 1
+                
+        # Clear cache
+        from django.core.cache import cache
+        cache.clear()
+        
+        self.message_user(request, f"{count} peserta berhasil ditandai sebagai hadir dan poin ditambahkan.")

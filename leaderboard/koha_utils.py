@@ -232,11 +232,6 @@ def get_live_members(date_from, date_to, search_q=None):
         if 'STATISTICAL' in name_upper or 'ADMIN' in name_upper or 'STAT' in cat_upper:
             continue
             
-        # Only include active people (with any activity), BUT always include staff and lecturer!
-        if v_cnt == 0 and b_cnt == 0 and sat_v_cnt == 0 and not search_q:
-            if role == 'student':
-                continue
-        
         faculty = _get_faculty_name(branch)
         year_enrolled = enrolled.year if hasattr(enrolled, 'year') else ''
         
@@ -244,6 +239,11 @@ def get_live_members(date_from, date_to, search_q=None):
         borrow_points = b_cnt * b_mult
         local_pt = local_points.get(str(card), 0)
         total_p = visit_points + borrow_points + local_pt
+
+        # Only include active people (with any library activity or local points), BUT always include staff and lecturer!
+        if v_cnt == 0 and b_cnt == 0 and sat_v_cnt == 0 and local_pt == 0 and not search_q:
+            if role == 'student':
+                continue
 
         # Calculate live badges dynamically!
         badges = []

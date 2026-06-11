@@ -5,6 +5,9 @@ import sys
 def main():
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'libraryrank.settings')
     try:
+        import sys
+        if sys.stdout.encoding != 'utf-8':
+            sys.stdout.reconfigure(encoding='utf-8')
         from django.core.management import execute_from_command_line
     except ImportError as exc:
         raise ImportError(

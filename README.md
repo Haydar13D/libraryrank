@@ -237,6 +237,22 @@ crontab -e
 
 ---
 
+## 🏆 Gamification & Extra Points (Seminar & Events)
+
+Apart from the automated sync from Koha, library administrators can award extra points for library events (e.g. Literacy Seminars, Book Fairs, Book Reviews) to increase student engagement:
+
+1. **Seminar Upload (CSV / Manual)**:
+   - Access **Django Admin** -> **Input Data Seminar**.
+   - Create a new entry, upload a `.csv` file containing student card numbers/NIMs (one per row) or paste card numbers directly into the **Manual Input** text box (separated by newlines or commas).
+   - Upon saving, the system automatically awards **+15 XP** (or the points value defined in `PointPolicy` for the `'seminar'` action) to each student and automatically flushes the leaderboard cache.
+2. **Merchandise Rewards System**:
+   - Physical merchandise (Tote Bag, Tumblers, Keychains, Umbrellas, etc.) can be configured via **Django Admin** -> **Rewards**.
+   - These items are rendered dynamically on the homepage carousel, encouraging students to actively visit the library and borrow books to redeem their points.
+3. **Point Transactions**:
+   - Librarians can manually adjust points (granting bonuses or deducting points for custom rewards) for any student via the **PointTransaction** model in the Admin panel.
+
+---
+
 ## 🌐 API Endpoints
 
 All support `?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD&q=search`
@@ -276,7 +292,7 @@ All support `?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD&q=search`
 → Wrong password in `.env`. Double-check `DB_PASSWORD`.
 
 **`ModuleNotFoundError: No module named 'MySQLdb'`**
-→ Run `pip install mysqlclient`. On Windows try `pip install mysqlclient --only-binary :all:`
+→ Run `pip install mysqlclient`. If it fails to compile or install on Windows, **no worries!** The project features an automatic fallback inside `libraryrank/__init__.py` that seamlessly maps `PyMySQL` (which is pre-packaged in `requirements.txt`) as `MySQLdb` so you can run the server immediately without compiling C binary drivers.
 
 **`sync_from_koha` says "Cannot connect to Koha"**
 → Check `KOHA_DB_*` values in `.env`. Make sure the `koha_reader` user has `SELECT` on `koha.*`.

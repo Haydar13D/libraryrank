@@ -94,8 +94,22 @@ DATABASES = {
         'OPTIONS': {
             'charset': 'utf8mb4',
             'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
+            'connect_timeout': 2,  # fallback cepat ke demo jika Koha tidak bisa diakses
         },
         'TEST': {'NAME': None},  # never create test DB from Koha connection
+    },
+    'satellite': {
+        'ENGINE':   'django.db.backends.mysql',
+        'NAME':     env('SATELLITE_DB_NAME',     default='koha_satellite'),
+        'USER':     env('SATELLITE_DB_USER',     default='pilot_satellite'),
+        'PASSWORD': env('SATELLITE_DB_PASSWORD', default=''),
+        'HOST':     env('SATELLITE_DB_HOST',     default='10.12.0.7'),
+        'PORT':     env('SATELLITE_DB_PORT',     default='3306'),
+        'OPTIONS': {
+            'charset': 'utf8mb4',
+            'connect_timeout': 2,  # fallback cepat ke demo jika satellite tidak bisa diakses
+        },
+        'TEST': {'NAME': None},  # never create test DB from satellite connection
     },
 }
 
@@ -146,6 +160,21 @@ KOHA_BRANCH_FACULTY_MAP = {
     'PSY': 'Psychology',
     'ARC': 'Architecture',
     'BIO': 'Biology',
+}
+
+# ─────────────────────────────────────────────────────────────
+# CACHING
+# Menggunakan LocMemCache (in-memory, built-in, tanpa instalasi)
+# untuk menyimpan hasil query Koha sementara (5-10 menit).
+# Jika di masa depan ada Redis, ganti BACKEND ke:
+#   'django.core.cache.backends.redis.RedisCache'
+# dan tambahkan LOCATION: 'redis://127.0.0.1:6379/1'
+# ─────────────────────────────────────────────────────────────
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'libraryrank-cache',
+    }
 }
 
 # ─────────────────────────────────────────────────────────────
@@ -238,3 +267,39 @@ UNFOLD = {
         },
     ],
 }
+
+# -----------------------------------------------------------------------------
+# MONKEY PATCH FOR DJANGO 5.0 + UNFOLD NESTED CONTEXT BUG
+# Fixes "ValueError: dictionary update sequence element #0 has length 8; 2 is required"
+# -----------------------------------------------------------------------------
+import django
+from django.template.context import BaseContext
+
+_original_flatten = BaseContext.flatten
+
+def _patched_flatten(self):
+    flat = {}
+    for d in self.dicts:
+        if hasattr(d, 'flatten') and callable(d.flatten):
+            flat.update(d.flatten())
+        elif isinstance(d, dict):
+            flat.update(d)
+        elif hasattr(d, 'dicts'):
+            for inner_d in d.dicts:
+                if isinstance(inner_d, dict):
+                    flat.update(inner_d)
+    return flat
+
+BaseContext.flatten = _patched_flatten
+
+
+# ─────────────────────────────────────────────────────────────
+# EMAIL CONFIGURATION (SMTP)
+# ─────────────────────────────────────────────────────────────
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = env('EMAIL_HOST_USER', default='')
+EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='')
+DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='UMSLibrary <noreply@ums.ac.id>')

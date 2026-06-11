@@ -4,77 +4,119 @@
 {% block content %}
 
 <div class="hero">
-  <div class="hero-glow"></div>
-  <h1>University Library<br><span>Leaderboard</span></h1>
-  <p>Celebrating top readers, visitors &amp; academic excellence across all faculties.</p>
+  <h1>UMSLibrary<br><span>Leaderboard</span></h1>
+  <p>merayakan pembaca, pengunjung &amp; teraktif serta prestasi akademik di seluruh fakultas.</p>
 </div>
 
 <div class="stats-bar" id="statsBar">
-  <div class="stat-chip"><span class="dot" style="background:var(--blue)"></span><strong id="statVisitors">—</strong>&nbsp;Total Kedatangan</div>
-  <div class="stat-chip"><span class="dot" style="background:var(--green)"></span><strong id="statBooks">—</strong>&nbsp;Books Borrowed</div>
-  <div class="stat-chip"><span class="dot" style="background:var(--purple)"></span><strong id="statMembers">—</strong>&nbsp;Active Members</div>
-  <div class="stat-chip"><span class="dot" style="background:var(--orange)"></span><strong id="statFaculties">—</strong>&nbsp;Faculties</div>
+  <div class="stat-chip"><span class="dot" style="background:var(--blue)"></span><strong
+      id="statVisitors">—</strong>&nbsp;Total Kedatangan</div>
+  <div class="stat-chip"><span class="dot" style="background:var(--green)"></span><strong
+      id="statBooks">—</strong>&nbsp;Books Borrowed</div>
+  <div class="stat-chip"><span class="dot" style="background:var(--blue)"></span><strong
+      id="statMembers">—</strong>&nbsp;Active Members</div>
+  <div class="stat-chip"><span class="dot" style="background:var(--orange)"></span><strong
+      id="statFaculties">—</strong>&nbsp;Faculties</div>
 </div>
 
-<!-- REWARDS MARQUEE -->
-{% if rewards %}
-<div class="rewards-marquee-container" style="overflow: hidden; width: 100%; max-width: 1200px; margin: 20px auto; background: var(--bg-card); border-radius: 12px; padding: 15px 0; border: 1px solid rgba(255, 255, 255, 0.05); position: relative;">
-  <div class="section-title" style="margin-left: 20px; font-size: 1.2rem; margin-bottom: 10px;">🎁 Tukarkan Poin dengan Merchandise Spesial!</div>
-  
-  <div class="marquee-wrapper" style="display: flex; overflow: hidden; position: relative; width: 100%;">
-    <div class="marquee-track" style="display: flex; gap: 20px; animation: scroll-left 25s linear infinite; padding: 0 10px;">
-      
-      <!-- Copy array twice for infinite smooth scrolling -->
-      {% for i in "12" %}
+<!-- MERCHANDISE CAROUSEL -->
+<div class="merch-carousel-wrapper"
+  style="overflow: hidden; width: 100%; max-width: 1200px; margin: 20px auto; background: var(--bg-card); border-radius: 16px; padding: 18px 0 14px; border: 1px solid rgba(255,215,0,0.15); position: relative;">
+  <div style="display:flex; align-items:center; justify-content:space-between; padding: 0 20px 10px;">
+    <div class="section-title" style="margin: 0; font-size: 1.15rem;"><span
+        class="material-icons-outlined">redeem</span> Merchandise Reward Perpustakaan</div>
+    <span style="font-size:0.75rem; color:#868275; font-style:italic; opacity:0.85;">⚠️ Gambar hanya pemanis, bisa
+      berbeda dengan produk aslinya</span>
+  </div>
+
+  <div style="position:relative; overflow:hidden;">
+    <!-- Track -->
+    <div id="merchTrack"
+      style="display:flex; gap:16px; padding:0 20px; transition: transform 0.45s cubic-bezier(.4,0,.2,1);">
+
       {% for reward in rewards %}
-      <div class="marquee-item" style="flex-shrink: 0; width: 180px; background: rgba(0,0,0,0.2); border-radius: 8px; padding: 10px; border: 1px solid rgba(255,215,0,0.2); display: flex; flex-direction: column; align-items: center;">
+      <div class="merch-slide" data-id="{{ reward.id }}" data-name="{{ reward.name }}" data-cost="{{ reward.points_cost }}" data-stock="{{ reward.stock }}"
+        style="flex-shrink:0; width:180px; background:rgba(0,0,0,0.25); border-radius:12px; padding:12px; border:1px solid rgba(255,215,0,0.18); display:flex; flex-direction:column; align-items:center; cursor:pointer; transition:transform 0.2s, box-shadow 0.2s;">
         {% if reward.image_url %}
-        <img src="{{ reward.image_url }}" alt="{{ reward.name }}" style="width: 100%; height: 120px; object-fit: cover; border-radius: 6px; margin-bottom: 10px;">
+          <img src="{{ reward.image_url }}" alt="{{ reward.name }}"
+            style="width:100%; height:130px; object-fit:cover; border-radius:8px; margin-bottom:10px;">
         {% else %}
-        <div style="width: 100%; height: 120px; background: rgba(255,215,0,0.1); border-radius: 6px; margin-bottom: 10px; display: flex; align-items: center; justify-content: center; font-size: 3rem;">🎁</div>
+          <img src="{% static 'img/merch/' %}{{ forloop.counter|default:1 }}.png" alt="{{ reward.name }}"
+            style="width:100%; height:130px; object-fit:cover; border-radius:8px; margin-bottom:10px;"
+            onerror="this.src='https://placehold.co/180x130/2f3185/ffffff?text={{ reward.name|urlencode }}';">
         {% endif %}
-        <h4 style="font-size: 0.9rem; margin: 0; text-align: center; color: white;">{{ reward.name }}</h4>
-        <span style="color: var(--gold); font-size: 0.8rem; font-weight: bold; margin-top: 5px;">{{ reward.points_cost }} XP</span>
+        <h4 style="font-size:0.88rem; margin:0 0 4px; text-align:center; color:white; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:100%;">{{ reward.name }}</h4>
+        <span style="color:var(--gold); font-size:0.78rem; font-weight:bold;">✨ {{ reward.points_cost }} XP</span>
+        <span style="color:#868275; font-size:0.7rem; margin-top:2px;">Stok: {{ reward.stock }}</span>
       </div>
+      {% empty %}
+      <div style="color: var(--muted); padding: 20px; text-align: center; width: 100%;">Belum ada merchandise yang tersedia.</div>
       {% endfor %}
-      {% endfor %}
-      
+
     </div>
+
+    <!-- Navigasi Panah -->
+    <button id="merchPrev" onclick="scrollMerch(-1)"
+      style="position:absolute; left:4px; top:50%; transform:translateY(-50%); background:rgba(0,0,0,0.55); border:none; border-radius:50%; width:34px; height:34px; color:white; font-size:1.1rem; cursor:pointer; z-index:10; display:flex; align-items:center; justify-content:center; transition:background 0.2s;">‹</button>
+    <button id="merchNext" onclick="scrollMerch(1)"
+      style="position:absolute; right:4px; top:50%; transform:translateY(-50%); background:rgba(0,0,0,0.55); border:none; border-radius:50%; width:34px; height:34px; color:white; font-size:1.1rem; cursor:pointer; z-index:10; display:flex; align-items:center; justify-content:center; transition:background 0.2s;">›</button>
   </div>
 </div>
 
 <style>
-@keyframes scroll-left {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(calc(-50% - 10px)); }
-}
-.marquee-track:hover {
-  animation-play-state: paused;
-}
+  .merch-slide:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(245, 200, 66, 0.18);
+  }
 </style>
-{% endif %}
+
+<script>
+  (function () {
+    const track = document.getElementById('merchTrack');
+    const slides = track.querySelectorAll('.merch-slide');
+    const slideW = 180 + 16; // width + gap
+    let current = 0;
+    const visible = () => Math.floor(track.parentElement.offsetWidth / slideW);
+    const maxIdx = () => Math.max(0, slides.length - visible());
+
+    window.scrollMerch = function (dir) {
+      current = Math.max(0, Math.min(current + dir, maxIdx()));
+      track.style.transform = `translateX(-${current * slideW}px)`;
+    };
+
+    // Auto-scroll every 3 seconds
+    setInterval(() => {
+      current = current >= maxIdx() ? 0 : current + 1;
+      track.style.transform = `translateX(-${current * slideW}px)`;
+    }, 3000);
+  })();
+</script>
+
 
 <!-- CONTROLS -->
 <div class="controls">
   <div class="search-wrap">
-    <span class="search-icon">🔍</span>
+    <span class="search-icon"><span class="material-icons-outlined">search</span></span>
     <input type="text" id="searchInput" placeholder="Search by name, ID, or faculty..." value="{{ search_q }}">
   </div>
   <input type="date" class="date-input" id="dateFrom" value="{{ date_from }}">
   <span class="date-sep">to</span>
   <input type="date" class="date-input" id="dateTo" value="{{ date_to }}">
-  <button class="btn-exp g" id="btnExcelExport">📊 Excel</button>
-  <button class="btn-exp r" id="btnPdfExport">📄 PDF</button>
+  <button class="btn-exp g" id="btnExcelExport"><span class="material-icons-outlined">analytics</span> Excel</button>
+  <button class="btn-exp r" id="btnPdfExport"><span class="material-icons-outlined">description</span> PDF</button>
 </div>
 
 <!-- TABS -->
 <div class="tab-nav">
-  <button class="tab-btn active" data-tab="overview">🏆 Overview</button>
-  <button class="tab-btn" data-tab="students">🎓 Students</button>
-  <button class="tab-btn" data-tab="lecturers">👨‍🏫 Lecturers</button>
-  <button class="tab-btn" data-tab="staff">👔 Staff</button>
-  <button class="tab-btn" data-tab="books">📖 Books &amp; Borrowers</button>
-  <button class="tab-btn" data-tab="faculties">🏛️ Faculties</button>
+  <button class="tab-btn active" data-tab="overview"><span class="material-icons-outlined">emoji_events</span>
+    Overview</button>
+  <button class="tab-btn" data-tab="students"><span class="material-icons-outlined">school</span> Students</button>
+  <button class="tab-btn" data-tab="lecturers"><span class="material-icons-outlined">person</span> Lecturers</button>
+  <button class="tab-btn" data-tab="staff"><span class="material-icons-outlined">work</span> Staff</button>
+  <button class="tab-btn" data-tab="books"><span class="material-icons-outlined">menu_book</span> Books &amp;
+    Borrowers</button>
+  <button class="tab-btn" data-tab="faculties"><span class="material-icons-outlined">account_balance</span>
+    Faculties</button>
 </div>
 
 <!-- MAIN CONTENT PANELS -->
@@ -87,7 +129,15 @@
       <div class="nom-skeleton nom-card lecturers"></div>
       <div class="nom-skeleton nom-card staff"></div>
     </div>
-    <div class="section-title">🏆 Top Poin (XP) Bulan Ini</div>
+    <div class="card-block" style="margin-bottom: 40px; padding: 24px;">
+      <h3 style="margin-bottom:16px; display:flex; align-items:center; gap:8px;"><span class="material-icons-outlined"
+          style="color:var(--gold);">analytics</span> Analitik Kunjungan</h3>
+      <div style="width:100%; height:300px; position:relative;">
+        <canvas id="overviewChart"></canvas>
+      </div>
+    </div>
+
+    <div class="section-title"><span class="material-icons-outlined">emoji_events</span> Top Poin (XP) Bulan Ini</div>
     <div class="leaderboard-list" id="overviewList">
       {% for i in "0123456" %}<div class="lb-skeleton"></div>{% endfor %}
     </div>
@@ -95,59 +145,89 @@
 
   <!-- STUDENTS -->
   <div id="panel-students" class="panel">
-    <div class="section-title">🎓 Student Rankings</div>
+    <div class="section-title"><span class="material-icons-outlined">school</span> Student Rankings</div>
     <div class="two-col">
       <div class="card-block">
-        <h3 style="margin-bottom:16px;">🚀 Top XP Leaderboard</h3>
-        <div class="leaderboard-list" id="list-students-visitors"></div>
+        <h3 style="margin-bottom:16px;"><span class="material-icons-outlined">rocket_launch</span> Top XP Leaderboard
+        </h3>
+        <div class="leaderboard-list" id="list-student-xp"></div>
       </div>
       <div class="card-block">
-        <h3 style="margin-bottom:16px;">📚 Top Borrowers</h3>
-        <div class="leaderboard-list" id="list-students-borrowers"></div>
+        <h3 style="margin-bottom:16px;"><span class="material-icons-outlined">directions_walk</span> Top Pengunjung</h3>
+        <div class="leaderboard-list" id="list-student-visitors"></div>
+      </div>
+      <div class="card-block">
+        <h3 style="margin-bottom:16px;"><span class="material-icons-outlined">library_books</span> Top Borrowers</h3>
+        <div class="leaderboard-list" id="list-student-borrowers"></div>
+      </div>
+      <div class="card-block">
+        <h3 style="margin-bottom:16px;"><span class="material-icons-outlined">local_activity</span> Top Peserta Seminar
+        </h3>
+        <div class="leaderboard-list" id="list-student-seminar"></div>
       </div>
     </div>
   </div>
 
   <!-- LECTURERS -->
   <div id="panel-lecturers" class="panel">
-    <div class="section-title">👨‍🏫 Lecturer Rankings</div>
+    <div class="section-title"><span class="material-icons-outlined">person</span> Lecturer Rankings</div>
     <div class="two-col">
       <div class="card-block">
-        <h3 style="margin-bottom:16px;">🚀 Top XP Leaderboard</h3>
-        <div class="leaderboard-list" id="list-lecturers-visitors"></div>
+        <h3 style="margin-bottom:16px;"><span class="material-icons-outlined">rocket_launch</span> Top XP Leaderboard
+        </h3>
+        <div class="leaderboard-list" id="list-lecturer-xp"></div>
       </div>
       <div class="card-block">
-        <h3 style="margin-bottom:16px;">📚 Top Borrowers</h3>
-        <div class="leaderboard-list" id="list-lecturers-borrowers"></div>
+        <h3 style="margin-bottom:16px;"><span class="material-icons-outlined">directions_walk</span> Top Pengunjung</h3>
+        <div class="leaderboard-list" id="list-lecturer-visitors"></div>
+      </div>
+      <div class="card-block">
+        <h3 style="margin-bottom:16px;"><span class="material-icons-outlined">library_books</span> Top Borrowers</h3>
+        <div class="leaderboard-list" id="list-lecturer-borrowers"></div>
+      </div>
+      <div class="card-block">
+        <h3 style="margin-bottom:16px;"><span class="material-icons-outlined">local_activity</span> Top Peserta Seminar
+        </h3>
+        <div class="leaderboard-list" id="list-lecturer-seminar"></div>
       </div>
     </div>
   </div>
 
   <!-- STAFF -->
   <div id="panel-staff" class="panel">
-    <div class="section-title">👔 Staff Rankings</div>
+    <div class="section-title"><span class="material-icons-outlined">work</span> Staff Rankings</div>
     <div class="two-col">
       <div class="card-block">
-        <h3 style="margin-bottom:16px;">🚀 Top XP Leaderboard</h3>
+        <h3 style="margin-bottom:16px;"><span class="material-icons-outlined">rocket_launch</span> Top XP Leaderboard
+        </h3>
+        <div class="leaderboard-list" id="list-staff-xp"></div>
+      </div>
+      <div class="card-block">
+        <h3 style="margin-bottom:16px;"><span class="material-icons-outlined">directions_walk</span> Top Pengunjung</h3>
         <div class="leaderboard-list" id="list-staff-visitors"></div>
       </div>
       <div class="card-block">
-        <h3 style="margin-bottom:16px;">📚 Top Borrowers</h3>
+        <h3 style="margin-bottom:16px;"><span class="material-icons-outlined">library_books</span> Top Borrowers</h3>
         <div class="leaderboard-list" id="list-staff-borrowers"></div>
+      </div>
+      <div class="card-block">
+        <h3 style="margin-bottom:16px;"><span class="material-icons-outlined">local_activity</span> Top Peserta Seminar
+        </h3>
+        <div class="leaderboard-list" id="list-staff-seminar"></div>
       </div>
     </div>
   </div>
 
   <!-- BOOKS -->
   <div id="panel-books" class="panel">
-    <div class="section-title">📖 Books &amp; Top Borrowers</div>
+    <div class="section-title"><span class="material-icons-outlined">menu_book</span> Books &amp; Top Borrowers</div>
     <div class="two-col">
       <div class="card-block">
-        <h3>📚 Most Borrowed Books</h3>
+        <h3><span class="material-icons-outlined">library_books</span> Most Borrowed Books</h3>
         <div id="booksList"></div>
       </div>
       <div class="card-block">
-        <h3>🏅 Top Book Borrowers</h3>
+        <h3><span class="material-icons-outlined">workspace_premium</span> Top Book Borrowers</h3>
         <div class="leaderboard-list" id="borrowerList"></div>
       </div>
     </div>
@@ -155,12 +235,14 @@
 
   <!-- FACULTIES -->
   <div id="panel-faculties" class="panel">
-    <div class="section-title">🏛️ Faculty Activity Rankings</div>
+    <div class="section-title"><span class="material-icons-outlined">account_balance</span> Faculty Activity Rankings
+    </div>
     <div class="card-block" style="margin-bottom:24px">
-      <h3>📊 Visitor Distribution by Faculty</h3>
+      <h3><span class="material-icons-outlined">analytics</span> Visitor Distribution by Faculty</h3>
       <div id="facultyBars" style="display:flex;flex-direction:column;gap:16px;margin-top:12px"></div>
     </div>
-    <div class="section-title">📚 Books &amp; Top Students by Faculty</div>
+    <div class="section-title"><span class="material-icons-outlined">library_books</span> Books &amp; Top Students by
+      Faculty</div>
     <div class="two-col">
       <div class="card-block">
         <h3>🔖 Books Borrowed per Faculty</h3>

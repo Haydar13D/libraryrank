@@ -1,47 +1,103 @@
 {% load static %}
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>LibraryRank — University Library Leaderboard</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{% static 'css/main.css' %}?v=5">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LibraryRank — UMSLibrary Leaderboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'css/main.css' %}?v=8">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    }
+  </script>
 </head>
+
 <body>
 
-<header>
-  <div class="logo">
-    <span class="logo-icon">📚</span>LibraryRank
+  <header class="ums-header">
+    <div class="header-left">
+      <a href="https://library.ums.ac.id/" target="_blank" class="logo-lockup">
+        <img src="{% static 'img/UMS Lib Polos (1).png' %}" alt="UMS Library Logo" class="ums-logo-img"
+          onerror="this.style.display='none';">
+        <div class="logo-text-block">
+          <div class="logo-main-title">UMSLibrary</div>
+          <div class="logo-sub-title">center of academic activities</div>
+          <div class="logo-npp">NPP : 3311122D2000002</div>
+        </div>
+        <div class="logo-accreditation">
+          <div class="acc-circle">
+            <span class="acc-grade">A</span>
+            <span class="acc-year">2020</span>
+          </div>
+        </div>
+      </a>
+    </div>
+
+    <nav class="header-nav">
+      <div class="nav-item">
+        <a href="#" class="nav-link" id="btnPanduan">PANDUAN</a>
+      </div>
+    </nav>
+
+    <div class="header-right" style="display:flex; align-items:center;">
+      <button id="themeToggle" style="background:rgba(255,255,255,0.1); border:none; color:white; cursor:pointer; display:flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:50%; margin-right:12px; transition:background 0.2s;" title="Toggle Dark Mode">
+        <span class="material-icons-outlined" id="themeIcon" style="font-size:1.2rem;">dark_mode</span>
+      </button>
+      <span class="live-badge"><span class="live-dot"></span>Live</span>
+      <span class="demo-badge">🧪 Demo Mode</span>
+      <a href="/admin/" class="btn-admin">👑 Admin Login</a>
+    </div>
+  </header>
+
+  {% block content %}{% endblock %}
+
+  <!-- MODAL -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal">
+      <button class="modal-close" id="modalClose">✕</button>
+      <div id="modalBody"></div>
+    </div>
   </div>
-  <div class="header-right">
-    <span class="live-badge"><span class="live-dot"></span>Live</span>
-    <span class="demo-badge">🧪 Demo Mode</span>
-    <a href="/admin/" class="btn-google" style="margin-left: 10px;">👑 Admin Login</a>
+
+  <!-- TOAST -->
+  <div class="toast" id="toast">
+    <span id="toastIcon">✅</span>
+    <span id="toastMsg">Done!</span>
   </div>
-</header>
 
-{% block content %}{% endblock %}
-
-<!-- MODAL -->
-<div class="modal-overlay" id="modalOverlay">
-  <div class="modal">
-    <button class="modal-close" id="modalClose">✕</button>
-    <div id="modalBody"></div>
-  </div>
-</div>
-
-<!-- TOAST -->
-<div class="toast" id="toast">
-  <span id="toastIcon">✅</span>
-  <span id="toastMsg">Done!</span>
-</div>
-
-<script>
-  const CSRF_TOKEN = '{{ csrf_token }}';
-</script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="{% static 'js/main.js' %}?v=4"></script>
+  <script>
+    const CSRF_TOKEN = '{{ csrf_token }}';
+  </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="{% static 'js/main.js' %}?v=7"></script>
+  <script>
+    const themeBtn = document.getElementById('themeToggle');
+    const themeIcon = document.getElementById('themeIcon');
+    const currentTheme = document.documentElement.getAttribute('data-theme');
+    if (currentTheme === 'dark') themeIcon.textContent = 'light_mode';
+    
+    themeBtn.addEventListener('click', () => {
+      const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+      if (isDark) {
+        document.documentElement.removeAttribute('data-theme');
+        localStorage.setItem('theme', 'light');
+        themeIcon.textContent = 'dark_mode';
+      } else {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        localStorage.setItem('theme', 'dark');
+        themeIcon.textContent = 'light_mode';
+      }
+      if (typeof loadTab === 'function' && typeof currentTab !== 'undefined') {
+        loadTab(currentTab);
+      }
+    });
+  </script>
 </body>
+
 </html>

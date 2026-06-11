@@ -94,6 +94,7 @@ class Member(models.Model):
     # Lecturer/Staff specific
     title = models.CharField(max_length=100, blank=True)
     department = models.CharField(max_length=100, blank=True)
+    email = models.EmailField(max_length=254, null=True, blank=True)
 
     photo = models.ImageField(upload_to='members/', null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -320,6 +321,7 @@ class Reward(models.Model):
 class PointTransaction(models.Model):
     TYPE_CHOICES = [
         ('event', 'Event Participation'),
+        ('seminar', 'Seminar Attendance'),
         ('redeem', 'Redeem Reward'),
         ('manual', 'Manual Adjustment'),
     ]
@@ -334,5 +336,105 @@ class PointTransaction(models.Model):
         
     def __str__(self):
         return f"{self.cardnumber} | {self.amount} ({self.transaction_type})"
+
+
+import csv
+import io
+class SeminarUpload(models.Model):
+    title = models.CharField(max_length=200, help_text="Nama atau Judul Seminar")
+    csv_file = models.FileField(upload_to='seminars/', help_text="Upload file CSV berisi satu kolom NIM/Cardnumber", blank=True, null=True)
+    manual_input = models.TextField(blank=True, help_text="Atau input NIM/Cardnumber mahasiswa di sini (satu NIM per baris)")
+    processed = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Input Data Seminar'
+        verbose_name_plural = 'Input Data Seminar'
+
+    def __str__(self):
+        return f"{self.title} ({self.created_at.strftime('%Y-%m-%d')})"
+
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None
+        super().save(*args, **kwargs)
+        
+        if not self.processed and (self.csv_file or self.manual_input):
+            try:
+                # Get points from policy
+                policy = PointPolicy.objects.filter(action_type='seminar', is_active=True).first()
+                points = policy.points if policy else 15
+                
+                cardnumbers = []
+                
+                # 1. Process CSV file if uploaded
+                if self.csv_file:
+                    try:
+                        self.csv_file.open('r')
+                        file_content = self.csv_file.read()
+                        
+                        # Handle bytes or string
+                        if isinstance(file_content, bytes):
+                            file_content = file_content.decode('utf-8-sig')
+                            
+                        csv_reader = csv.reader(io.StringIO(file_content))
+                        for row in csv_reader:
+                            if row and row[0].strip():
+                                cardnumber = row[0].strip()
+                                if cardnumber.lower() not in ['nim', 'cardnumber', 'id']:
+                                    cardnumbers.append(cardnumber.upper())
+                    finally:
+                        self.csv_file.close()
+                        
+                # 2. Process manual textbox input if provided
+                if self.manual_input:
+                    for line in self.manual_input.splitlines():
+                        for part in line.replace(',', ' ').split():
+                            cnum = part.strip()
+                            if cnum and cnum.lower() not in ['nim', 'cardnumber', 'id']:
+                                cardnumbers.append(cnum.upper())
+                                
+                # Remove duplicates preserving order
+                unique_cardnumbers = list(dict.fromkeys(cardnumbers))
+                
+                if unique_cardnumbers:
+                    transactions = []
+                    for cardnumber in unique_cardnumbers:
+                        transactions.append(PointTransaction(
+                            cardnumber=cardnumber,
+                            amount=points,
+                            transaction_type='seminar',
+                            description=f"Peserta: {self.title}"
+                        ))
+                    PointTransaction.objects.bulk_create(transactions)
+                
+                self.processed = True
+                super().save(update_fields=['processed'])
+                
+                # Clear leaderboard cache automatically
+                from django.core.cache import cache
+                cache.clear()
+            except Exception as e:
+                # Log error or print
+                print(f"Error processing Seminar Input: {e}")
+
+
+class RedemptionClaim(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pending / Belum Diambil'),
+        ('claimed', 'Claimed / Sudah Diambil'),
+    ]
+    code = models.CharField(max_length=50, unique=True, db_index=True)
+    member = models.ForeignKey(Member, on_delete=models.CASCADE, related_name='redemptions')
+    reward = models.ForeignKey(Reward, on_delete=models.CASCADE, related_name='redemptions')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    created_at = models.DateTimeField(auto_now_add=True)
+    claimed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.code} — {self.member.name} ({self.status})"
 
 

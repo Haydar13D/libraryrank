@@ -1,7 +1,9 @@
 import datetime
+import hashlib
 from django.db import connections
 from django.conf import settings
-from .models import PointPolicy, BadgeRule, SystemLog, PointTransaction
+from django.core.cache import cache
+from .models import PointPolicy, BadgeRule, SystemLog, PointTransaction, LevelTier
 import time
 
 def _get_role_from_category(categorycode):
@@ -47,16 +49,76 @@ def _format_initials(name):
         return name[:2].upper()
     return '??'
 
+def _get_satellite_visits(date_from, date_to_plus_1):
+    """
+    Ambil data kunjungan dari koha_satellite.visitorhistory menggunakan pymysql
+    (kompatibel dengan MariaDB lama versi 10.1+).
+    Returns: dict {cardnumber: visit_count}
+    Hasil dicache 5 menit karena koneksi ke server eksternal paling lambat.
+    """
+    import pymysql
+
+    # Cache key berdasarkan tanggal range
+    cache_key = f"sat_visits_{date_from}_{date_to_plus_1}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    try:
+        db = settings.DATABASES.get('satellite', {})
+        conn = pymysql.connect(
+            host=db.get('HOST', '10.12.0.7'),
+            user=db.get('USER', 'pilot_satellite'),
+            password=db.get('PASSWORD', ''),
+            database=db.get('NAME', 'koha_satellite'),
+            port=int(db.get('PORT', 3306)),
+            charset='utf8mb4',
+            connect_timeout=5,
+        )
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT cardnumber, COUNT(*) as visit_count
+                FROM visitorhistory
+                WHERE visittime >= %s AND visittime < %s
+                  AND cardnumber IS NOT NULL AND cardnumber != ''
+                GROUP BY cardnumber
+            """, [date_from, date_to_plus_1])
+            result = {str(card).strip(): cnt for card, cnt in cursor.fetchall()}
+        conn.close()
+        cache.set(cache_key, result, 300)  # cache 5 menit
+        return result
+    except Exception:
+        return {}
+
+
 def get_live_members(date_from, date_to, search_q=None):
     """
     Executes a direct query to Koha using memory aggregations.
+    Visit data is pulled from BOTH:
+      1. koha_satellite.visitorhistory  (gate scanner — primary)
+      2. koha.statistics                (circulation — secondary/fallback)
+    Hasil di-cache 5 menit agar semua endpoint yang memanggil fungsi ini
+    dalam satu periode tidak membebani database berulang kali.
     """
+    # ── Cache layer ──────────────────────────────────────────────────────────
+    cache_key = "lm_" + hashlib.md5(
+        f"{date_from}|{date_to}|{search_q or ''}".encode()
+    ).hexdigest()
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+    # ─────────────────────────────────────────────────────────────────────────
+
     start_time = time.time()
     date_to_plus_1 = date_to + datetime.timedelta(days=1)
-    
+
+    # ── Step 1: Ambil data kunjungan dari Satellite (visitorhistory) ───────
+    satellite_visits = _get_satellite_visits(date_from, date_to_plus_1)
+
+    # ── Step 2: Ambil data dari Koha ──────────────────────────────────────
     with connections['koha'].cursor() as cursor:
         params = [date_from, date_to_plus_1, date_from, date_to_plus_1, date_from, date_to_plus_1]
-        
+
         # We group first internally, then join to borrowers. This is standard fast SQL.
         sql = """
         SELECT
@@ -83,15 +145,15 @@ def get_live_members(date_from, date_to, search_q=None):
             GROUP BY borrowernumber
         ) oi ON b.borrowernumber = oi.borrowernumber
         """
-        
+
         if search_q:
             sql += " WHERE b.firstname LIKE %s OR b.surname LIKE %s OR b.cardnumber LIKE %s"
             qs = f"%{search_q}%"
             params.extend([qs, qs, qs])
-            
+
         cursor.execute(sql, params)
         rows = cursor.fetchall()
-        
+
     duration = round((time.time() - start_time) * 1000, 2)
     
     # Try logging DB fetch
@@ -121,19 +183,43 @@ def get_live_members(date_from, date_to, search_q=None):
     except Exception:
         all_badges = []
         
+    # Dynamic Level Tiers
+    try:
+        tiers = list(LevelTier.objects.all().order_by('min_xp'))
+    except Exception:
+        tiers = []
+        
     # Manual Points from Transactions
     try:
-        from django.db.models import Sum
-        pt_qs = PointTransaction.objects.values('cardnumber').annotate(total=Sum('amount'))
-        local_points = {item['cardnumber']: item['total'] or 0 for item in pt_qs if item['cardnumber']}
+        from django.db.models import Sum, Count
+        pt_qs = PointTransaction.objects.values('cardnumber', 'transaction_type').annotate(total=Sum('amount'), cnt=Count('id'))
+        local_points = {}
+        seminar_counts = {}
+        for item in pt_qs:
+            cnum = item['cardnumber']
+            if not cnum: continue
+            
+            if cnum not in local_points:
+                local_points[cnum] = 0
+            local_points[cnum] += item['total'] or 0
+            
+            if item['transaction_type'] == 'seminar':
+                seminar_counts[cnum] = item['cnt']
     except Exception:
         local_points = {}
+        seminar_counts = {}
     
     for row in rows:
         borrowernumber, card, fname, sname, cat, branch, enrolled, v_cnt, b_cnt = row
         v_cnt = v_cnt or 0
         b_cnt = b_cnt or 0
-        
+
+        # Gabungkan kunjungan dari satellite (gate scan) + Koha statistics
+        # Ambil mana yang lebih besar (gate scan biasanya lebih banyak)
+        card_str = str(card).strip() if card else ''
+        sat_v_cnt = satellite_visits.get(card_str, 0)
+        v_cnt = max(v_cnt, sat_v_cnt)
+
         full_name = f"{(fname or '').strip()} {(sname or '').strip()}".strip() or str(card)
         role = _get_role_from_category(cat)
         
@@ -146,8 +232,8 @@ def get_live_members(date_from, date_to, search_q=None):
         if 'STATISTICAL' in name_upper or 'ADMIN' in name_upper or 'STAT' in cat_upper:
             continue
             
-        # Only include active people, BUT always include staff and lecturer so they don't appear empty!
-        if v_cnt == 0 and b_cnt == 0 and not search_q:
+        # Only include active people (with any activity), BUT always include staff and lecturer!
+        if v_cnt == 0 and b_cnt == 0 and sat_v_cnt == 0 and not search_q:
             if role == 'student':
                 continue
         
@@ -163,14 +249,44 @@ def get_live_members(date_from, date_to, search_q=None):
         badges = []
         for br in all_badges:
             if br.criteria_type == 'visits_week' and v_cnt >= br.min_value:
-                badges.append({'id': br.id_code, 'name': br.name, 'icon': br.icon, 'color': br.color, 'desc': br.desc})
+                badges.append({'id': br.id_code, 'name': br.name, 'icon': br.icon, 'color': br.color, 'desc': br.desc, 'image_url': br.image_url})
             elif br.criteria_type == 'borrows_semester' and b_cnt >= br.min_value:
-                badges.append({'id': br.id_code, 'name': br.name, 'icon': br.icon, 'color': br.color, 'desc': br.desc})
+                badges.append({'id': br.id_code, 'name': br.name, 'icon': br.icon, 'color': br.color, 'desc': br.desc, 'image_url': br.image_url})
 
         if faculty:
             sub = f"{card} · {faculty}"
         else:
             sub = f"{card}"
+
+        s_cnt = seminar_counts.get(str(card), 0)
+
+        # Calculate level dynamically based on total_p
+        member_level = {'name': 'Visitor', 'level_num': 1, 'current_xp': total_p, 'min_xp': 0, 'max_xp': 100, 'progress_perc': 0, 'color': '#95a5a6'}
+        if tiers:
+            found = False
+            for tier in tiers:
+                if tier.max_xp is None or total_p <= tier.max_xp:
+                    progress = 100
+                    if tier.max_xp is not None:
+                        denom = max(1, tier.max_xp - tier.min_xp)
+                        progress = int(((total_p - tier.min_xp) / denom) * 100)
+                    member_level = {
+                        'name': tier.name,
+                        'level_num': tier.level_num,
+                        'current_xp': total_p,
+                        'min_xp': tier.min_xp,
+                        'max_xp': tier.max_xp if tier.max_xp is not None else total_p,
+                        'progress_perc': min(100, progress),
+                        'color': tier.color
+                    }
+                    found = True
+                    break
+            if not found:
+                highest = tiers[-1]
+                member_level = {
+                    'name': highest.name, 'level_num': highest.level_num, 'current_xp': total_p, 
+                    'min_xp': highest.min_xp, 'max_xp': total_p, 'progress_perc': 100, 'color': highest.color
+                }
 
         members.append({
             'id': str(card),
@@ -185,9 +301,11 @@ def get_live_members(date_from, date_to, search_q=None):
             'streak': 0, # Cannot calculate streak reliably without querying specific dates
             'sub': sub,
             'badges': badges,
+            'level': member_level,
             'total_p': total_p,
             'v_cnt': v_cnt,
-            'b_cnt': b_cnt
+            'b_cnt': b_cnt,
+            's_cnt': s_cnt
         })
         
     # Sort members by total points descending
@@ -196,9 +314,11 @@ def get_live_members(date_from, date_to, search_q=None):
     # Assign Library Legend to top 10
     for i, m in enumerate(members[:10]):
         if m['total_p'] > 0:
-            m['badges'].insert(0, {'id': 'library_legend', 'name': 'Library Legend', 'icon': '🥇', 'color': '#f1c40f', 'desc': 'Top 10 Klasemen!'})
+            m['badges'].insert(0, {'id': 'library_legend', 'name': 'Library Legend', 'icon': '🥇', 'color': '#f1c40f', 'desc': 'Top 10 Klasemen!', 'image_url': '/static/img/badges/top 10 leaderboard.png'})
             m['rank'] = i + 1
-            
+
+    # Simpan ke cache 5 menit
+    cache.set(cache_key, members, 300)
     return members
 
 def get_live_member_detail(cardnumber, date_from, date_to):
@@ -346,3 +466,96 @@ def get_live_books_stats(date_from, date_to):
         })
         
     return books
+
+
+def get_live_daily_visits(date_from, date_to, live_members, is_filtered=False):
+    """
+    Calculate daily visits (Monday to Sunday) using real data from:
+      1. koha_satellite.visitorhistory (primary gate scan logs)
+      2. koha.statistics (fallback circulation logs)
+    Returns a list of 7 integers representing visits from Senin (Index 0) to Minggu (Index 6).
+    """
+    import pymysql
+    date_to_plus_1 = date_to + datetime.timedelta(days=1)
+    
+    daily_counts = [0] * 7 # Index 0=Senin, ..., 6=Minggu
+    
+    if not live_members and is_filtered:
+        return daily_counts
+        
+    # Koha statistics query
+    koha_sql = """
+        SELECT DAYOFWEEK(datetime) as dow, COUNT(*) as cnt
+        FROM statistics
+        WHERE datetime >= %s AND datetime < %s
+          AND type IN ('issue', 'localuse', 'return')
+    """
+    koha_params = [date_from, date_to_plus_1]
+    
+    # Satellite visitorhistory query
+    sat_sql = """
+        SELECT DAYOFWEEK(visittime) as dow, COUNT(*) as cnt
+        FROM visitorhistory
+        WHERE visittime >= %s AND visittime < %s
+    """
+    sat_params = [date_from, date_to_plus_1]
+    
+    # If filtered by search query and the list is not too large
+    if is_filtered and len(live_members) < 2000:
+        bnums = [m['borrowernumber'] for m in live_members if m.get('borrowernumber')]
+        cards = [m['id'] for m in live_members if m.get('id')]
+        
+        if bnums:
+            koha_sql += " AND borrowernumber IN ({})".format(",".join(["%s"] * len(bnums)))
+            koha_params.extend(bnums)
+        else:
+            koha_sql += " AND 1=0"
+            
+        if cards:
+            sat_sql += " AND cardnumber IN ({})".format(",".join(["%s"] * len(cards)))
+            sat_params.extend(cards)
+        else:
+            sat_sql += " AND 1=0"
+            
+    koha_sql += " GROUP BY dow"
+    sat_sql += " GROUP BY dow"
+    
+    # Run Koha query
+    koha_result = {}
+    try:
+        with connections['koha'].cursor() as cursor:
+            cursor.execute(koha_sql, koha_params)
+            koha_result = {row[0]: row[1] for row in cursor.fetchall()}
+    except Exception:
+        pass
+        
+    # Run Satellite query
+    sat_result = {}
+    try:
+        db = settings.DATABASES.get('satellite', {})
+        conn = pymysql.connect(
+            host=db.get('HOST', '10.12.0.7'),
+            user=db.get('USER', 'pilot_satellite'),
+            password=db.get('PASSWORD', ''),
+            database=db.get('NAME', 'koha_satellite'),
+            port=int(db.get('PORT', 3306)),
+            charset='utf8mb4',
+            connect_timeout=5,
+        )
+        with conn.cursor() as cursor:
+            cursor.execute(sat_sql, sat_params)
+            sat_result = {row[0]: row[1] for row in cursor.fetchall()}
+        conn.close()
+    except Exception:
+        pass
+        
+    # Combine results: take the max of gate scans or statistics for each day of the week
+    for dow in range(1, 8):
+        k_val = koha_result.get(dow, 0)
+        s_val = sat_result.get(dow, 0)
+        max_val = max(k_val, s_val)
+        
+        idx = (dow - 2) % 7
+        daily_counts[idx] = max_val
+        
+    return daily_counts

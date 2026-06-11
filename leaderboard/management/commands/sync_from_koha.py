@@ -9,11 +9,14 @@ Koha tables used (read-only):
   categories      → role mapping (student/lecturer/staff)
   issues          → active checkouts (BorrowRecord)
   old_issues      → returned checkouts (BorrowRecord)
-  statistics      → visit/issue events (Visit)
+  statistics      → visit/issue events (Visit) — as fallback
   biblio          → book title
   biblioitems     → book ISBN
   items           → book copy info
   branches        → library branches → faculty mapping
+
+Koha Satellite tables used (read-only, host: 10.12.0.7):
+  visitorhistory  → visit events from gate scanner (primary visit source)
 
 Run this on a schedule (e.g. every night via cron):
   0 1 * * * /path/to/venv/bin/python manage.py sync_from_koha >> /var/log/libraryrank_sync.log 2>&1
@@ -51,18 +54,37 @@ class Command(BaseCommand):
         self.full = options['full']
 
         if self.dry_run:
-            self.stdout.write(self.style.WARNING('⚠️  DRY RUN — nothing will be written\n'))
+            self.stdout.write(self.style.WARNING('[DRY RUN] nothing will be written\n'))
 
-        self.stdout.write('🔗 Connecting to Koha MySQL/MariaDB...')
+        self.stdout.write('Connecting to Koha MySQL/MariaDB...')
 
         try:
             koha = connections['koha']
             koha.ensure_connection()
-            self.stdout.write(self.style.SUCCESS('✅ Connected to Koha database\n'))
+            self.stdout.write(self.style.SUCCESS('Connected to Koha database'))
         except Exception as e:
-            self.stdout.write(self.style.ERROR(f'❌ Cannot connect to Koha: {e}'))
+            self.stdout.write(self.style.ERROR(f'Cannot connect to Koha: {e}'))
             self.stdout.write('   Check KOHA_DB_* settings in your .env file.')
             return
+
+        # Try connecting to satellite database (visitorhistory) via pymysql directly
+        # (kompatibel dengan MariaDB lama versi 10.1 yang ada di server satellite)
+        self.satellite_conn = None
+        try:
+            import pymysql
+            sat_db = settings.DATABASES.get('satellite', {})
+            self.satellite_conn = pymysql.connect(
+                host=sat_db.get('HOST', '10.12.0.7'),
+                user=sat_db.get('USER', 'pilot_satellite'),
+                password=sat_db.get('PASSWORD', ''),
+                database=sat_db.get('NAME', 'koha_satellite'),
+                port=int(sat_db.get('PORT', 3306)),
+                charset='utf8mb4',
+                connect_timeout=5,
+            )
+            self.stdout.write(self.style.SUCCESS('Connected to Koha Satellite database (visitorhistory)\n'))
+        except Exception as e:
+            self.stdout.write(self.style.WARNING(f'Cannot connect to Satellite DB: {e} — visit sync will use Koha statistics only\n'))
 
         self.koha = koha
         self.since = date.today() - timedelta(days=self.days) if not self.full else date(2000, 1, 1)
@@ -74,13 +96,13 @@ class Command(BaseCommand):
         self._sync_visits(member_map)
         self._sync_borrows(member_map, book_map)
 
-        self.stdout.write(self.style.SUCCESS('\n🎉 Koha sync complete!'))
+        self.stdout.write(self.style.SUCCESS('\nKoha sync complete!'))
 
     # ─────────────────────────────────────────────────────
     # STEP 1: Faculties from Koha branches
     # ─────────────────────────────────────────────────────
     def _sync_faculties(self):
-        self.stdout.write('📍 Syncing faculties from Koha branches...')
+        self.stdout.write('Syncing faculties from Koha branches...')
         branch_map = getattr(settings, 'KOHA_BRANCH_FACULTY_MAP', {})
         faculty_colors = [
             '#4da6ff','#3de08a','#9b72ff','#ff6eb4',
@@ -102,20 +124,20 @@ class Command(BaseCommand):
                     defaults={'name': faculty_name, 'color': color}
                 )
                 faculty_map[code] = faculty
-                action = '✨ Created' if created else '🔄 Updated'
+                action = 'Created' if created else 'Updated'
             else:
                 self.stdout.write(f'   [dry] Would upsert Faculty: {faculty_name} ({code})')
                 action = '   [dry]'
                 faculty_map[code] = None
 
-        self.stdout.write(f'   ✅ {len(branches)} branches → faculties')
+        self.stdout.write(f'   {len(branches)} branches -> faculties')
         return faculty_map
 
     # ─────────────────────────────────────────────────────
     # STEP 2: Members from Koha borrowers
     # ─────────────────────────────────────────────────────
     def _sync_members(self, faculty_map):
-        self.stdout.write('👥 Syncing members from Koha borrowers...')
+        self.stdout.write('Syncing members from Koha borrowers...')
 
         student_cats  = [c.upper() for c in settings.KOHA_STUDENT_CATEGORIES]
         lecturer_cats = [c.upper() for c in settings.KOHA_LECTURER_CATEGORIES]
@@ -181,6 +203,7 @@ class Command(BaseCommand):
                             'faculty': faculty,
                             'year_enrolled': year_enrolled,
                             'title': (category_desc or '')[:100],
+                            'email': email.strip() if email and email.strip() else f"{member_id.lower()}@student.ums.ac.id",
                             'is_active': True,
                         }
                     )
@@ -193,7 +216,7 @@ class Command(BaseCommand):
                     self.stdout.write(f'   [dry] {role}: {full_name} ({member_id})')
 
         self.stdout.write(
-            f'   ✅ Members: {created_count} created, {updated_count} updated, {skipped_count} skipped (unknown category)'
+            f'   Members: {created_count} created, {updated_count} updated, {skipped_count} skipped (unknown category)'
         )
         return member_map
 
@@ -201,7 +224,7 @@ class Command(BaseCommand):
     # STEP 3: Books from Koha biblio + biblioitems
     # ─────────────────────────────────────────────────────
     def _sync_books(self, faculty_map):
-        self.stdout.write('📚 Syncing books from Koha biblio...')
+        self.stdout.write('Syncing books from Koha biblio...')
 
         with self.koha.cursor() as cursor:
             cursor.execute("""
@@ -249,66 +272,109 @@ class Command(BaseCommand):
                     else:
                         updated_count += 1
 
-        self.stdout.write(f'   ✅ Books: {created_count} created, {updated_count} updated')
+        self.stdout.write(f'   Books: {created_count} created, {updated_count} updated')
         return book_map
 
     # ─────────────────────────────────────────────────────
-    # STEP 4: Visits from Koha statistics table
-    # Koha logs every checkout, renewal, return in `statistics`.
-    # We treat any 'issue' (checkout) event as a library visit.
+    # STEP 4a: Visits from Koha Satellite — visitorhistory (gate scanner)
+    # This is the PRIMARY source of visits: data dari mesin scan
+    # pintu masuk perpustakaan (cardnumber di-scan = 1 kunjungan).
     # ─────────────────────────────────────────────────────
     def _sync_visits(self, member_map):
-        self.stdout.write(f'🚪 Syncing visits from Koha statistics (since {self.since})...')
+        # Build a reverse lookup: cardnumber → Member
+        card_to_member = {m.member_id: m for m in member_map.values()}
 
+        # ── PRIMARY: Satellite visitorhistory ──────────────────────────────
+        sat_created = sat_skipped = 0
+        if self.satellite_conn:
+            self.stdout.write(f'Syncing visits from Satellite visitorhistory (since {self.since})...')
+            with self.satellite_conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT cardnumber, visittime, location
+                    FROM visitorhistory
+                    WHERE visittime >= %s
+                      AND cardnumber IS NOT NULL
+                      AND cardnumber != ''
+                    ORDER BY visittime
+                """, [self.since])
+                sat_rows = cursor.fetchall()
+
+            from datetime import time as time_cls
+            with transaction.atomic():
+                for cardnumber, visittime, location in sat_rows:
+                    member = card_to_member.get(str(cardnumber).strip())
+                    if not member:
+                        sat_skipped += 1
+                        continue
+
+                    if not self.dry_run:
+                        visit_dt = visittime if timezone.is_aware(visittime) else timezone.make_aware(visittime)
+                        # Early Bird bonus: +3 jika datang sebelum 09:00
+                        visit_points = 5 if visit_dt.time() < time_cls(9, 0) else 2
+
+                        _, created_flag = Visit.objects.get_or_create(
+                            member=member,
+                            visited_at__date=visit_dt.date(),
+                            defaults={
+                                'visited_at': visit_dt,
+                                'purpose': f'Gate scan: {location or "perpus"}',
+                                'earned_points': visit_points
+                            }
+                        )
+                        if created_flag:
+                            sat_created += 1
+
+            self.stdout.write(f'   Visits (gate scan): {sat_created} created, {sat_skipped} skipped (patron not in system)')
+        else:
+            self.stdout.write(self.style.WARNING('   Satellite DB tidak tersambung — melewati sinkronisasi visitorhistory.'))
+
+        # ── SECONDARY: Koha statistics (issue/localuse/return) ────────────
+        self.stdout.write(f'Syncing visits from Koha statistics (since {self.since})...')
         with self.koha.cursor() as cursor:
             cursor.execute("""
-                SELECT
-                    borrowernumber,
-                    datetime,
-                    branch,
-                    type
+                SELECT borrowernumber, datetime, branch, type
                 FROM statistics
-                WHERE
-                    borrowernumber IS NOT NULL
-                    AND datetime >= %s
-                    AND type IN ('issue', 'localuse', 'return')
+                WHERE borrowernumber IS NOT NULL
+                  AND datetime >= %s
+                  AND type IN ('issue', 'localuse', 'return')
                 ORDER BY datetime
             """, [self.since])
             rows = cursor.fetchall()
 
-        created = skipped = 0
-        visits_to_create = []
-
+        koha_created = koha_skipped = 0
+        from datetime import time as time_cls
         with transaction.atomic():
             for borrowernumber, dt, branch, stat_type in rows:
                 member = member_map.get(borrowernumber)
                 if not member:
-                    skipped += 1
+                    koha_skipped += 1
                     continue
 
                 if not self.dry_run:
-                    # Use get_or_create to avoid duplicate visits per member per day
-                    visit_dt = dt if hasattr(dt, 'tzinfo') else timezone.make_aware(dt)
-                    from datetime import time
-                
-                    # Bonus Early Bird: +3 points if visited before 09:00 AM (Total 5 points, else 2 points)
-                    visit_points = 5 if visit_dt.time() < time(9, 0) else 2
-                
+                    visit_dt = dt if timezone.is_aware(dt) else timezone.make_aware(dt)
+                    visit_points = 5 if visit_dt.time() < time_cls(9, 0) else 2
+
+                    # get_or_create: jika hari itu sudah ada entri kunjungan (dari gate scan),
+                    # tidak akan dibuat duplikat
                     _, created_flag = Visit.objects.get_or_create(
                         member=member,
                         visited_at__date=visit_dt.date(),
-                        defaults={'visited_at': visit_dt, 'purpose': f'Koha: {stat_type}', 'earned_points': visit_points}
+                        defaults={
+                            'visited_at': visit_dt,
+                            'purpose': f'Koha: {stat_type}',
+                            'earned_points': visit_points
+                        }
                     )
                     if created_flag:
-                        created += 1
+                        koha_created += 1
 
-        self.stdout.write(f'   ✅ Visits: {created} created, {skipped} skipped (patron not in system)')
+        self.stdout.write(f'   Visits (Koha stats): {koha_created} created, {koha_skipped} skipped (patron not in system)')
 
     # ─────────────────────────────────────────────────────
     # STEP 5: Borrow records from Koha issues + old_issues
     # ─────────────────────────────────────────────────────
     def _sync_borrows(self, member_map, book_map):
-        self.stdout.write(f'📖 Syncing borrow records from Koha issues (since {self.since})...')
+        self.stdout.write(f'Syncing borrow records from Koha issues (since {self.since})...')
 
         # Active checkouts
         with self.koha.cursor() as cursor:
@@ -357,9 +423,9 @@ class Command(BaseCommand):
                     continue
 
                 if not self.dry_run:
-                    issue_dt   = timezone.make_aware(issuedate) if issuedate and not hasattr(issuedate, 'tzinfo') else issuedate
-                    return_dt  = timezone.make_aware(returndate) if returndate and not hasattr(returndate, 'tzinfo') else returndate
-                    due_date   = date_due if isinstance(date_due, date) else (date_due.date() if date_due else None)
+                    issue_dt   = issuedate if not issuedate or timezone.is_aware(issuedate) else timezone.make_aware(issuedate)
+                    return_dt  = returndate if not returndate or timezone.is_aware(returndate) else timezone.make_aware(returndate)
+                    due_date   = date_due.date() if isinstance(date_due, datetime) else date_due
 
                     # Determine overdue status
                     if status == 'borrowed' and due_date and due_date < date.today():
@@ -397,4 +463,4 @@ class Command(BaseCommand):
                     if flag:
                         created += 1
 
-        self.stdout.write(f'   ✅ Borrow records: {created} created, {skipped} skipped')
+        self.stdout.write(f'   Borrow records: {created} created, {skipped} skipped')

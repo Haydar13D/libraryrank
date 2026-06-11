@@ -1,72 +1,86 @@
 """
-Fallback demo data — shown when the database is empty.
-Once you run `python manage.py sync_from_koha` or `seed_demo_data`,
-real data from MySQL takes over automatically.
+Fallback demo data — ditampilkan saat koneksi ke Koha tidak tersedia.
+Data ini menggunakan nama, NIM, dan fakultas Indonesia yang realistis.
 """
 
+# visits = jumlah raw (akan dikali 15 menjadi XP oleh _add_level)
+# books  = jumlah buku dipinjam semester ini
+
 _STUDENTS = [
-    {'id':'S001','name':'Ahmad Zulkifli','faculty':'Computer Science','year':2021,'visits':128,'books':24,'streak':14,'initials':'AZ','role':'student','sub':'Computer Science · 2021','faculty_color':'#4da6ff'},
-    {'id':'S002','name':'Putri Maharani','faculty':'Medicine','year':2022,'visits':115,'books':31,'streak':9,'initials':'PM','role':'student','sub':'Medicine · 2022','faculty_color':'#9b72ff'},
-    {'id':'S003','name':'Rizky Pratama','faculty':'Engineering','year':2020,'visits':108,'books':19,'streak':7,'initials':'RP','role':'student','sub':'Engineering · 2020','faculty_color':'#3de08a'},
-    {'id':'S004','name':'Sari Dewi Kusuma','faculty':'Economics','year':2021,'visits':97,'books':22,'streak':11,'initials':'SD','role':'student','sub':'Economics · 2021','faculty_color':'#ff6eb4'},
-    {'id':'S005','name':'Fajar Hidayat','faculty':'Law','year':2023,'visits':89,'books':15,'streak':5,'initials':'FH','role':'student','sub':'Law · 2023','faculty_color':'#ff914d'},
-    {'id':'S006','name':'Nadia Anggraeni','faculty':'Psychology','year':2022,'visits':82,'books':28,'streak':6,'initials':'NA','role':'student','sub':'Psychology · 2022','faculty_color':'#f5c842'},
-    {'id':'S007','name':'Dimas Saputra','faculty':'Architecture','year':2021,'visits':75,'books':13,'streak':4,'initials':'DS','role':'student','sub':'Architecture · 2021','faculty_color':'#ff5c5c'},
-    {'id':'S008','name':'Lestari Wahyu','faculty':'Biology','year':2023,'visits':68,'books':17,'streak':8,'initials':'LW','role':'student','sub':'Biology · 2023','faculty_color':'#41e0d0'},
-    {'id':'S009','name':'Bagus Santoso','faculty':'Computer Science','year':2020,'visits':61,'books':20,'streak':3,'initials':'BS','role':'student','sub':'Computer Science · 2020','faculty_color':'#4da6ff'},
-    {'id':'S010','name':'Yuni Astuti','faculty':'Engineering','year':2022,'visits':54,'books':11,'streak':2,'initials':'YA','role':'student','sub':'Engineering · 2022','faculty_color':'#3de08a'},
+    {'id':'L202201001','name':'Ahmad Fauzi Ramadhan',    'faculty':'Ilmu Komputer',           'year':2022,'visits':28,'books':12,'streak':14,'initials':'AF','role':'student','sub':'Ilmu Komputer · 2022','faculty_color':'#4da6ff'},
+    {'id':'L202102001','name':'Siti Nurhaliza Putri',    'faculty':'Kedokteran',               'year':2021,'visits':25,'books':18,'streak':9, 'initials':'SN','role':'student','sub':'Kedokteran · 2021','faculty_color':'#9b72ff'},
+    {'id':'L202201002','name':'Rizky Maulana Akbar',     'faculty':'Teknik',                   'year':2022,'visits':23,'books':9, 'streak':7, 'initials':'RM','role':'student','sub':'Teknik · 2022','faculty_color':'#3de08a'},
+    {'id':'L202304001','name':'Dewi Ayu Lestari',        'faculty':'Ekonomi dan Bisnis',       'year':2023,'visits':21,'books':14,'streak':11,'initials':'DA','role':'student','sub':'Ekonomi dan Bisnis · 2023','faculty_color':'#ff6eb4'},
+    {'id':'L202105001','name':'Muhammad Hafiz Ibrahim',  'faculty':'Hukum',                    'year':2021,'visits':20,'books':7, 'streak':5, 'initials':'MH','role':'student','sub':'Hukum · 2021','faculty_color':'#ff914d'},
+    {'id':'L202206001','name':'Anisa Rahma Fitriani',    'faculty':'Psikologi',                'year':2022,'visits':18,'books':11,'streak':6, 'initials':'AR','role':'student','sub':'Psikologi · 2022','faculty_color':'#f5c842'},
+    {'id':'L202001001','name':'Dimas Arya Kusuma',       'faculty':'Teknik',                   'year':2020,'visits':17,'books':8, 'streak':4, 'initials':'DA','role':'student','sub':'Teknik · 2020','faculty_color':'#3de08a'},
+    {'id':'L202302001','name':'Fajar Nurfadillah',       'faculty':'Ilmu Komputer',            'year':2023,'visits':16,'books':6, 'streak':3, 'initials':'FN','role':'student','sub':'Ilmu Komputer · 2023','faculty_color':'#4da6ff'},
+    {'id':'L202203001','name':'Laila Nur Aini',          'faculty':'Kedokteran',               'year':2022,'visits':15,'books':15,'streak':3, 'initials':'LN','role':'student','sub':'Kedokteran · 2022','faculty_color':'#9b72ff'},
+    {'id':'L202104001','name':'Bagas Prasetyo Utomo',    'faculty':'Ekonomi dan Bisnis',       'year':2021,'visits':14,'books':10,'streak':2, 'initials':'BP','role':'student','sub':'Ekonomi dan Bisnis · 2021','faculty_color':'#ff6eb4'},
+    {'id':'L202306001','name':'Cindy Permata Sari',      'faculty':'Psikologi',                'year':2023,'visits':13,'books':8, 'streak':2, 'initials':'CP','role':'student','sub':'Psikologi · 2023','faculty_color':'#f5c842'},
+    {'id':'L202005001','name':'Evan Drajat Wicaksana',   'faculty':'Hukum',                    'year':2020,'visits':12,'books':5, 'streak':2, 'initials':'ED','role':'student','sub':'Hukum · 2020','faculty_color':'#ff914d'},
+    {'id':'L202207001','name':'Galih Setiawan Nugroho',  'faculty':'Pertanian',                'year':2022,'visits':11,'books':7, 'streak':1, 'initials':'GS','role':'student','sub':'Pertanian · 2022','faculty_color':'#41e0d0'},
+    {'id':'L202108001','name':'Hana Safitri Rahayu',     'faculty':'Ilmu Sosial dan Ilmu Politik','year':2021,'visits':10,'books':9,'streak':1,'initials':'HS','role':'student','sub':'FISIP · 2021','faculty_color':'#ff5c5c'},
+    {'id':'L202002001','name':'Irfan Mauludi Santoso',   'faculty':'Ilmu Komputer',            'year':2020,'visits':9, 'books':4, 'streak':1, 'initials':'IM','role':'student','sub':'Ilmu Komputer · 2020','faculty_color':'#4da6ff'},
+    {'id':'L202301001','name':'Joko Prasetyo Budi',      'faculty':'Teknik',                   'year':2023,'visits':8, 'books':3, 'streak':1, 'initials':'JP','role':'student','sub':'Teknik · 2023','faculty_color':'#3de08a'},
+    {'id':'L202103001','name':'Karina Astuti Wulandari', 'faculty':'Kedokteran',               'year':2021,'visits':8, 'books':13,'streak':1, 'initials':'KA','role':'student','sub':'Kedokteran · 2021','faculty_color':'#9b72ff'},
+    {'id':'L202204001','name':'Luqman Hakim Salim',      'faculty':'Ekonomi dan Bisnis',       'year':2022,'visits':7, 'books':6, 'streak':0, 'initials':'LH','role':'student','sub':'Ekonomi dan Bisnis · 2022','faculty_color':'#ff6eb4'},
+    {'id':'L202307001','name':'Maya Indah Permatasari',  'faculty':'Pertanian',                'year':2023,'visits':7, 'books':5, 'streak':0, 'initials':'MI','role':'student','sub':'Pertanian · 2023','faculty_color':'#41e0d0'},
+    {'id':'L202208001','name':'Naufal Ardiansyah Putra', 'faculty':'Ilmu Sosial dan Ilmu Politik','year':2022,'visits':6,'books':4, 'streak':0,'initials':'NA','role':'student','sub':'FISIP · 2022','faculty_color':'#ff5c5c'},
 ]
 
 _LECTURERS = [
-    {'id':'L001','name':'Dr. Siti Rahayu','faculty':'Engineering','title':'Associate Prof.','visits':94,'books':18,'streak':21,'initials':'SR','role':'lecturer','sub':'Engineering · Associate Prof.','faculty_color':'#3de08a'},
-    {'id':'L002','name':'Prof. Eko Budiman','faculty':'Medicine','title':'Professor','visits':87,'books':25,'streak':18,'initials':'EB','role':'lecturer','sub':'Medicine · Professor','faculty_color':'#9b72ff'},
-    {'id':'L003','name':'Dr. Anwar Hasan','faculty':'Law','title':'Lecturer','visits':79,'books':12,'streak':15,'initials':'AH','role':'lecturer','sub':'Law · Lecturer','faculty_color':'#ff914d'},
-    {'id':'L004','name':'Dr. Rina Sulistyo','faculty':'Economics','title':'Associate Prof.','visits':71,'books':20,'streak':10,'initials':'RS','role':'lecturer','sub':'Economics · Associate Prof.','faculty_color':'#ff6eb4'},
-    {'id':'L005','name':'Dr. Yudha Nugraha','faculty':'Computer Science','title':'Lecturer','visits':65,'books':9,'streak':8,'initials':'YN','role':'lecturer','sub':'Computer Science · Lecturer','faculty_color':'#4da6ff'},
-    {'id':'L006','name':'Prof. Dewi Santika','faculty':'Psychology','title':'Professor','visits':58,'books':22,'streak':12,'initials':'DS','role':'lecturer','sub':'Psychology · Professor','faculty_color':'#f5c842'},
-    {'id':'L007','name':'Dr. Hafiz Ramadhan','faculty':'Architecture','title':'Lecturer','visits':50,'books':7,'streak':5,'initials':'HR','role':'lecturer','sub':'Architecture · Lecturer','faculty_color':'#ff5c5c'},
+    {'id':'NIP20010001','name':'Dr. Siti Rahayu, M.T.',        'faculty':'Teknik',              'title':'Lektor Kepala','visits':22,'books':10,'streak':21,'initials':'SR','role':'lecturer','sub':'Teknik · Lektor Kepala','faculty_color':'#3de08a'},
+    {'id':'NIP20020001','name':'Prof. Eko Supriyanto, Ph.D.',  'faculty':'Kedokteran',          'title':'Guru Besar',   'visits':19,'books':14,'streak':18,'initials':'ES','role':'lecturer','sub':'Kedokteran · Guru Besar','faculty_color':'#9b72ff'},
+    {'id':'NIP20030001','name':'Dr. Anwar Fauzi, S.H., M.H.', 'faculty':'Hukum',               'title':'Dosen',        'visits':17,'books':8, 'streak':15,'initials':'AF','role':'lecturer','sub':'Hukum · Dosen','faculty_color':'#ff914d'},
+    {'id':'NIP20040001','name':'Dr. Rina Sulistyowati, M.Sc.','faculty':'Ekonomi dan Bisnis',  'title':'Lektor Kepala','visits':15,'books':11,'streak':10,'initials':'RS','role':'lecturer','sub':'Ekonomi dan Bisnis · Lektor Kepala','faculty_color':'#ff6eb4'},
+    {'id':'NIP20050001','name':'Dr. Yudha Pratama, M.Kom.',   'faculty':'Ilmu Komputer',       'title':'Dosen',        'visits':14,'books':5, 'streak':8, 'initials':'YP','role':'lecturer','sub':'Ilmu Komputer · Dosen','faculty_color':'#4da6ff'},
+    {'id':'NIP20060001','name':'Prof. Dewi Wulandari, Ph.D.', 'faculty':'Psikologi',           'title':'Guru Besar',   'visits':12,'books':16,'streak':12,'initials':'DW','role':'lecturer','sub':'Psikologi · Guru Besar','faculty_color':'#f5c842'},
+    {'id':'NIP20070001','name':'Dr. Hafiz Nugraha, M.T.',     'faculty':'Teknik',              'title':'Dosen',        'visits':10,'books':6, 'streak':5, 'initials':'HN','role':'lecturer','sub':'Teknik · Dosen','faculty_color':'#3de08a'},
 ]
 
 _STAFF = [
-    {'id':'ST001','name':'Budi Hartono','faculty':'Administration','dept':'Administration','title':'Senior Staff','visits':76,'books':5,'streak':30,'initials':'BH','role':'staff','sub':'Administration · Senior Staff','faculty_color':'#8892aa'},
-    {'id':'ST002','name':'Wati Lestari','faculty':'Cataloging','dept':'Cataloging','title':'Librarian','visits':68,'books':8,'streak':25,'initials':'WL','role':'staff','sub':'Cataloging · Librarian','faculty_color':'#8892aa'},
-    {'id':'ST003','name':'Agus Priyono','faculty':'IT Support','dept':'IT Support','title':'Staff','visits':59,'books':4,'streak':18,'initials':'AP','role':'staff','sub':'IT Support · Staff','faculty_color':'#8892aa'},
-    {'id':'ST004','name':'Erna Susanti','faculty':'Reference','dept':'Reference','title':'Senior Librarian','visits':51,'books':11,'streak':22,'initials':'ES','role':'staff','sub':'Reference · Senior Librarian','faculty_color':'#8892aa'},
-    {'id':'ST005','name':'Joko Widodo','faculty':'Circulation','dept':'Circulation','title':'Staff','visits':43,'books':3,'streak':14,'initials':'JW','role':'staff','sub':'Circulation · Staff','faculty_color':'#8892aa'},
+    {'id':'STF20110001','name':'Budi Santoso',    'faculty':'Administrasi Umum','dept':'Administrasi Umum', 'title':'Staf Senior',      'visits':18,'books':3,'streak':30,'initials':'BS','role':'staff','sub':'Administrasi · Staf Senior','faculty_color':'#8892aa'},
+    {'id':'STF20120001','name':'Wati Rahayu',     'faculty':'Pengolahan',        'dept':'Pengolahan',        'title':'Pustakawan',       'visits':16,'books':5,'streak':25,'initials':'WR','role':'staff','sub':'Pengolahan · Pustakawan','faculty_color':'#8892aa'},
+    {'id':'STF20130001','name':'Agus Wibowo',     'faculty':'IT & Sistem',       'dept':'IT & Sistem',       'title':'Staf IT',          'visits':14,'books':2,'streak':18,'initials':'AW','role':'staff','sub':'IT & Sistem · Staf IT','faculty_color':'#8892aa'},
+    {'id':'STF20140001','name':'Erna Damayanti',  'faculty':'Referensi',         'dept':'Referensi',         'title':'Pustakawan Senior','visits':12,'books':7,'streak':22,'initials':'ED','role':'staff','sub':'Referensi · Pustakawan Senior','faculty_color':'#8892aa'},
+    {'id':'STF20150001','name':'Joko Wahono',     'faculty':'Sirkulasi',         'dept':'Sirkulasi',         'title':'Staf Pelayanan',   'visits':10,'books':2,'streak':14,'initials':'JW','role':'staff','sub':'Sirkulasi · Staf Pelayanan','faculty_color':'#8892aa'},
 ]
 
 _BOOKS = [
-    {'title':'Introduction to Algorithms','author':'Cormen et al.','category':'Computer Science','borrows':47},
-    {'title':'Principles of Economics','author':'N. Gregory Mankiw','category':'Economics','borrows':39},
-    {"title":"Gray's Anatomy",'author':'Henry Gray','category':'Medicine','borrows':35},
-    {'title':"Black's Law Dictionary",'author':'Henry Black','category':'Law','borrows':31},
-    {'title':'Structural Analysis','author':'R.C. Hibbeler','category':'Engineering','borrows':28},
-    {'title':'Psychology','author':'David Myers','category':'Psychology','borrows':24},
-    {'title':'Calculus: Early Transcendentals','author':'James Stewart','category':'Mathematics','borrows':22},
-    {'title':'Organic Chemistry','author':'John McMurry','category':'Chemistry','borrows':19},
+    {'title':'Pemrograman Web Modern dengan Django',        'author':'Arief Budiman, S.Kom.',          'category':'Informatika',        'borrows':47},
+    {'title':'Algoritma dan Struktur Data',                 'author':'Dr. Hendra Wijaya',              'category':'Informatika',        'borrows':41},
+    {'title':'Pengantar Ilmu Ekonomi Makro',                'author':'Prof. Sadono Sukirno',           'category':'Ekonomi',            'borrows':38},
+    {'title':'Ilmu Bedah Dasar Edisi 5',                    'author':'Mansjoer, Arif et al.',          'category':'Kedokteran',         'borrows':35},
+    {'title':'Hukum Perdata Indonesia',                     'author':'Prof. R. Subekti, S.H.',         'category':'Hukum',              'borrows':31},
+    {'title':'Statistika untuk Penelitian',                 'author':'Prof. Sugiyono',                 'category':'Metodologi',         'borrows':29},
+    {'title':'Manajemen Keuangan Perusahaan',               'author':'Dr. Agus Salim, M.M.',           'category':'Manajemen',          'borrows':26},
+    {'title':'Machine Learning: Teori dan Implementasi',    'author':'Prof. Budi Santosa, Ph.D.',      'category':'Kecerdasan Buatan',  'borrows':23},
+    {'title':'Psikologi Sosial Terapan',                    'author':'Dr. Sarlito Wirawan',            'category':'Psikologi',          'borrows':20},
+    {'title':'Mekanika Tanah dan Fondasi',                  'author':'Braja M. Das (Alih Bahasa)',     'category':'Teknik Sipil',       'borrows':17},
 ]
 
 _FACULTIES = [
-    {'name':'Computer Science','code':'CS','color':'#4da6ff','visitors':284,'books':156},
-    {'name':'Engineering','code':'ENG','color':'#3de08a','visitors':241,'books':129},
-    {'name':'Medicine','code':'MED','color':'#9b72ff','visitors':228,'books':187},
-    {'name':'Economics','code':'ECO','color':'#ff6eb4','visitors':195,'books':98},
-    {'name':'Law','code':'LAW','color':'#ff914d','visitors':167,'books':71},
-    {'name':'Psychology','code':'PSY','color':'#f5c842','visitors':143,'books':88},
-    {'name':'Architecture','code':'ARC','color':'#ff5c5c','visitors':118,'books':54},
-    {'name':'Biology','code':'BIO','color':'#41e0d0','visitors':101,'books':67},
+    {'name':'Ilmu Komputer',             'code':'FILKOM', 'color':'#4da6ff','visitors':312,'books':178},
+    {'name':'Teknik',                    'code':'FT',     'color':'#3de08a','visitors':287,'books':143},
+    {'name':'Kedokteran',                'code':'FK',     'color':'#9b72ff','visitors':261,'books':201},
+    {'name':'Ekonomi dan Bisnis',        'code':'FEB',    'color':'#ff6eb4','visitors':219,'books':112},
+    {'name':'Hukum',                     'code':'FH',     'color':'#ff914d','visitors':184,'books':79},
+    {'name':'Psikologi',                 'code':'FPSI',   'color':'#f5c842','visitors':156,'books':94},
+    {'name':'Pertanian',                 'code':'FP',     'color':'#41e0d0','visitors':121,'books':68},
+    {'name':'Ilmu Sosial dan Ilmu Politik','code':'FISIP','color':'#ff5c5c','visitors':108,'books':57},
 ]
 
 def _add_level(item):
-    item['visits'] = item['visits'] * 15 # scale up to look like XP points
+    item['visits'] = item['visits'] * 15  # scale up to look like XP points
     xp = item['visits']
     levels = [
-        (0, 100, 'Visitor', 1, '#95a5a6'),
-        (101, 300, 'Reader', 2, '#3498db'),
-        (301, 700, 'Scholar', 3, '#2ecc71'),
-        (701, 1500, 'Researcher', 4, '#9b59b6'),
-        (1501, 3000, 'Sage', 5, '#e67e22'),
-        (3001, float('inf'), 'Library Legend', 'MAX', '#f1c40f')
+        (0,    100,  'Pengunjung',     1,     '#95a5a6'),
+        (101,  300,  'Pembaca',        2,     '#3498db'),
+        (301,  700,  'Pelajar',        3,     '#2ecc71'),
+        (701,  1500, 'Peneliti',       4,     '#9b59b6'),
+        (1501, 3000, 'Cendekia',       5,     '#e67e22'),
+        (3001, float('inf'), 'Legenda Perpus', 'MAX', '#f1c40f')
     ]
     for min_xp, max_xp, name, lv_num, color in levels:
         if xp <= max_xp:
@@ -107,9 +121,9 @@ DEMO_DATA = {
             'staff':    _STAFF[0],
         },
         'stats': {
-            'total_visitors': 2847,
-            'total_books':    512,
-            'active_members': 189,
+            'total_visitors': 3847,
+            'total_books':    743,
+            'active_members': 247,
             'total_faculties': 8,
         },
     },

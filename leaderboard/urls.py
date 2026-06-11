@@ -15,6 +15,8 @@ urlpatterns = [
     path('api/faculties/', views.api_faculties, name='api_faculties'),
     path('api/member/<str:member_id>/', views.api_member_detail, name='api_member'),
     path('api/pemustaka-teraktif/', views.api_pemustaka_teraktif, name='api_pemustaka_teraktif'),
+    path('api/redeem/request-otp/', views.api_request_otp, name='api_request_otp'),
+    path('api/redeem/confirm/', views.api_verify_otp_and_redeem, name='api_verify_otp_and_redeem'),
 
     # Exports
     path('export/excel/', views.export_excel, name='export_excel'),

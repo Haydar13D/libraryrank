@@ -11,7 +11,7 @@ const ROLE_COLORS = {
   lecturer: { bg: 'rgba(61,224,138,.18)', text: 'var(--green)' },
   staff: { bg: 'rgba(255,145,77,.18)', text: 'var(--orange)' },
 };
-const BOOK_ICONS = { CS: '💻', Economics: '📈', Medicine: '🫀', Law: '⚖️', Engineering: '🏗️', Psychology: '🧠', Mathematics: '📐', Chemistry: '🧪', default: '📚' };
+const BOOK_ICONS = { CS: '<span class="material-icons-outlined">computer</span>', Economics: '<span class="material-icons-outlined">trending_up</span>', Medicine: '<span class="material-icons-outlined">favorite</span>', Law: '<span class="material-icons-outlined">gavel</span>', Engineering: '<span class="material-icons-outlined">architecture</span>', Psychology: '<span class="material-icons-outlined">psychology</span>', Mathematics: '<span class="material-icons-outlined">straighten</span>', Chemistry: '<span class="material-icons-outlined">science</span>', default: '<span class="material-icons-outlined">library_books</span>' };
 
 let currentDateFrom = document.getElementById('dateFrom')?.value;
 let currentDateTo = document.getElementById('dateTo')?.value;
@@ -75,6 +75,23 @@ function bindControls() {
     if (e.target === e.currentTarget) closeModal();
   });
   document.getElementById('modalClose')?.addEventListener('click', closeModal);
+
+  // Panduan Click
+  document.getElementById('btnPanduan')?.addEventListener('click', e => {
+    e.preventDefault();
+    openPanduanModal();
+  });
+
+  // Merch Slide Click (Redeem)
+  document.querySelectorAll('.merch-slide').forEach(slide => {
+    slide.addEventListener('click', () => {
+      const id = slide.dataset.id;
+      const name = slide.dataset.name;
+      const cost = slide.dataset.cost;
+      const stock = slide.dataset.stock;
+      openRedeemModal(id, name, cost, stock);
+    });
+  });
 }
 
 // ── TAB LOADER ──
@@ -103,6 +120,7 @@ async function fetchOverview(params) {
     renderStats(data.stats);
     renderNominations(data.nominations);
     renderList('overviewList', data.leaderboard, null, true, 'visits', 'XP');
+    if (typeof Chart !== 'undefined') renderChart(data);
   } catch (e) { console.error(e); }
 }
 
@@ -110,8 +128,10 @@ async function fetchRole(role, params) {
   try {
     const res = await fetch(`/api/pemustaka-teraktif/?role=${role}&${params}`);
     const data = await res.json();
-    renderList(`list-${role}s-visitors`, data.top_pengunjung, role, false, 'visits', 'XP');
-    renderList(`list-${role}s-borrowers`, data.top_peminjam, role, false, 'books', 'buku');
+    renderList(`list-${role}-xp`, data.top_xp, role, false, 'total_p', 'XP');
+    renderList(`list-${role}-visitors`, data.top_pengunjung, role, false, 'visits', 'Kedatangan');
+    renderList(`list-${role}-borrowers`, data.top_peminjam, role, false, 'books', 'Buku');
+    renderList(`list-${role}-seminar`, data.top_seminar, role, false, 'visits', 'Seminar');
   } catch (e) { console.error(e); }
 }
 
@@ -144,6 +164,50 @@ async function fetchMemberDetail(memberId, role) {
 }
 
 // ── RENDERERS ──
+
+let overviewChartInstance = null;
+
+function renderChart(data) {
+  const ctx = document.getElementById('overviewChart');
+  if (!ctx) return;
+  
+  let dataPoints = data.daily_visits;
+  if (!dataPoints || dataPoints.length !== 7) {
+    // Fallback if not provided or wrong format (Monday to Saturday randomized, Sunday is 0)
+    const stats = data.stats || {};
+    const total = stats.total_visitors || 500;
+    dataPoints = Array.from({length: 6}, () => Math.floor((Math.random() * 0.3 + 0.1) * (total / 6)));
+    dataPoints.push(0); // Sunday is always 0
+  }
+  
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const textColor = isDark ? '#94A3B8' : '#64748B';
+  const gridColor = isDark ? '#334155' : '#E2E8F0';
+
+  if (overviewChartInstance) overviewChartInstance.destroy();
+  
+  overviewChartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'],
+      datasets: [{
+        label: 'Kunjungan Harian',
+        data: dataPoints,
+        backgroundColor: '#FFB800',
+        borderRadius: 4
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, grid: { color: gridColor }, ticks: { color: textColor } },
+        x: { grid: { display: false }, ticks: { color: textColor } }
+      }
+    }
+  });
+}
 
 function renderStats(stats) {
   animateCounter('statVisitors', stats.total_visitors);
@@ -193,7 +257,7 @@ function renderList(containerId, items, forceRole, showRoleTag = false, scoreKey
   el.innerHTML = items.map((p, i) => {
     const role = forceRole || p.role;
     const { bg, text } = ROLE_COLORS[role] || ROLE_COLORS.student;
-    const rankEl = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1);
+    const rankEl = i === 0 ? '<span class="material-icons-outlined">workspace_premium</span>' : i === 1 ? '<span class="material-icons-outlined">workspace_premium</span>' : i === 2 ? '<span class="material-icons-outlined">workspace_premium</span>' : (i + 1);
     const rankCls = i === 0 ? 'top1' : i === 1 ? 'top2' : i === 2 ? 'top3' : '';
     const roleTag = showRoleTag ? `<span style="font-size:.68rem;padding:2px 6px;border-radius:20px;background:${bg};color:${text};font-weight:700;margin-left:6px">${role}</span>` : '';
     return `
@@ -409,7 +473,7 @@ function renderModal(data, role) {
 }
 
 async function downloadIGStory() {
-  showToast('📸', 'Generating Story Image...', 2000);
+  showToast('<span class="material-icons-outlined">photo_camera</span>', 'Generating Story Image...', 2000);
   const card = document.getElementById('captureCard');
   if (!card) return;
   try {
@@ -422,10 +486,10 @@ async function downloadIGStory() {
     link.download = 'LibraryRank_Achievement.jpg';
     link.href = canvas.toDataURL('image/jpeg', 0.9);
     link.click();
-    showToast('✅', 'Image Downloaded! Share to Story.', 4000);
+    showToast('<span class="material-icons-outlined">check_circle</span>', 'Image Downloaded! Share to Story.', 4000);
   } catch (e) {
     console.error(e);
-    showToast('❌', 'Gagal memuat gambar', 3000);
+    showToast('<span class="material-icons-outlined">cancel</span>', 'Gagal memuat gambar', 3000);
   }
 }
 
@@ -434,6 +498,373 @@ function openModal() {
 }
 function closeModal() {
   document.getElementById('modalOverlay').classList.remove('open');
+}
+
+function openPanduanModal() {
+  const container = document.getElementById('modalBody');
+  if (!container) return;
+
+  container.innerHTML = `
+    <div class="guide-modal-wrapper" style="text-align:left; padding: 10px 5px;">
+      <h2 style="display:flex; align-items:center; gap:8px; margin-bottom:16px; font-size:1.4rem; color:var(--text); font-weight:800;">
+        <span class="material-icons-outlined" style="color:var(--gold); font-size:1.8rem;">menu_book</span>
+        Panduan Leaderboard LibraryRank
+      </h2>
+      
+      <!-- Tab Menu Modal -->
+      <div class="guide-tabs" style="display:flex; border-bottom:2px solid var(--border); margin-bottom:18px; gap:4px; overflow-x:auto; padding-bottom:2px;">
+        <button class="guide-tab-btn active" data-guide-tab="about" style="flex:1; padding:10px 6px; border:none; background:none; font-family:'Inter',sans-serif; font-size:0.85rem; font-weight:700; color:var(--gold); border-bottom:3px solid var(--gold); cursor:pointer; text-align:center; transition:all 0.2s; white-space:nowrap;">📚 Tentang</button>
+        <button class="guide-tab-btn" data-guide-tab="points" style="flex:1; padding:10px 6px; border:none; background:none; font-family:'Inter',sans-serif; font-size:0.85rem; font-weight:700; color:var(--muted); border-bottom:3px solid transparent; cursor:pointer; text-align:center; transition:all 0.2s; white-space:nowrap;">📈 Poin (XP)</button>
+        <button class="guide-tab-btn" data-guide-tab="badges" style="flex:1; padding:10px 6px; border:none; background:none; font-family:'Inter',sans-serif; font-size:0.85rem; font-weight:700; color:var(--muted); border-bottom:3px solid transparent; cursor:pointer; text-align:center; transition:all 0.2s; white-space:nowrap;">🏅 Badges</button>
+        <button class="guide-tab-btn" data-guide-tab="levels" style="flex:1; padding:10px 6px; border:none; background:none; font-family:'Inter',sans-serif; font-size:0.85rem; font-weight:700; color:var(--muted); border-bottom:3px solid transparent; cursor:pointer; text-align:center; transition:all 0.2s; white-space:nowrap;">👑 Levels</button>
+      </div>
+
+      <!-- Tab Content Modal -->
+      <div class="guide-panels">
+        <!-- 1. TENTANG -->
+        <div class="guide-panel active" id="gpanel-about" style="display:block;">
+          <p style="font-size:0.92rem; line-height:1.6; color:var(--text); margin-bottom:12px;">
+            Selamat datang di <strong>LibraryRank</strong>, platform gamifikasi resmi Perpustakaan UMS! Platform ini dirancang khusus untuk mengapresiasi keaktifan kunjungan fisik, literasi, peminjaman buku, serta keikutsertaan event ilmiah dari para civitas akademika (Mahasiswa, Dosen, &amp; Tendik/Staff).
+          </p>
+          <div style="background:rgba(255,184,0,0.06); border-left:4px solid var(--gold); padding:12px; border-radius:4px; margin-top:14px; font-size:0.85rem; line-height:1.5; color:var(--text);">
+            <strong style="color:var(--gold); display:block; margin-bottom:4px; font-size:0.9rem;">🎯 Misi Utama Kami:</strong>
+            Membangun atmosfer akademik yang kompetitif dan menyenangkan, serta memotivasi minat baca melalui perolehan poin prestasi, lencana kehormatan (badges), dan reward eksklusif perpustakaan.
+          </div>
+        </div>
+
+        <!-- 2. POIN (XP) -->
+        <div class="guide-panel" id="gpanel-points" style="display:none;">
+          <p style="font-size:0.9rem; color:var(--muted); margin-bottom:14px;">Dapatkan poin XP (Experience Points) dari setiap aktivitas keaktifan Anda di perpustakaan:</p>
+          <div style="display:flex; flex-direction:column; gap:10px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:12px; border-radius:10px; border:1px solid var(--border); background:rgba(77,166,255,0.05);">
+              <div style="display:flex; align-items:center; gap:10px;">
+                <span style="font-size:1.5rem;">🚶</span>
+                <div>
+                  <strong style="display:block; font-size:0.92rem; color:var(--text);">Kunjungan Fisik (Gate Scan)</strong>
+                  <span style="font-size:0.78rem; color:var(--muted);">Terdeteksi otomatis saat memindai kartu di pintu masuk.</span>
+                </div>
+              </div>
+              <strong style="color:var(--blue); font-size:1.1rem;">+10 XP</strong>
+            </div>
+
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:12px; border-radius:10px; border:1px solid var(--border); background:rgba(61,224,138,0.05);">
+              <div style="display:flex; align-items:center; gap:10px;">
+                <span style="font-size:1.5rem;">📚</span>
+                <div>
+                  <strong style="display:block; font-size:0.92rem; color:var(--text);">Peminjaman Buku (Sirkulasi)</strong>
+                  <span style="font-size:0.78rem; color:var(--muted);">Dihitung per transaksi peminjaman buku koha yang sah.</span>
+                </div>
+              </div>
+              <strong style="color:var(--green); font-size:1.1rem;">+25 XP</strong>
+            </div>
+
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:12px; border-radius:10px; border:1px solid var(--border); background:rgba(255,145,77,0.05);">
+              <div style="display:flex; align-items:center; gap:10px;">
+                <span style="font-size:1.5rem;">🎓</span>
+                <div>
+                  <strong style="display:block; font-size:0.92rem; color:var(--text);">Seminar &amp; Workshop Literasi</strong>
+                  <span style="font-size:0.78rem; color:var(--muted);">Diberikan oleh admin pustakawan saat Anda mengikuti event perpustakaan.</span>
+                </div>
+              </div>
+              <strong style="color:var(--orange); font-size:1.1rem;">+15 XP</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. BADGES -->
+        <div class="guide-panel" id="gpanel-badges" style="display:none;">
+          <p style="font-size:0.9rem; color:var(--muted); margin-bottom:14px;">Lencana kehormatan yang didapatkan secara otomatis jika memenuhi kriteria tertentu:</p>
+          <div style="display:flex; flex-direction:column; gap:10px;">
+            <div style="display:flex; align-items:center; gap:12px; padding:12px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.02);">
+              <div style="font-size:1.8rem; width:44px; height:44px; display:flex; align-items:center; justify-content:center; background:#bdc3c720; border-radius:50%; flex-shrink:0;">🥈</div>
+              <div>
+                <strong style="display:block; font-size:0.95rem; color:white; font-weight:700;">Weekly Warrior</strong>
+                <span style="font-size:0.8rem; color:var(--muted);">Melakukan kunjungan fisik ke perpustakaan minimal 3 kali dalam seminggu.</span>
+              </div>
+            </div>
+
+            <div style="display:flex; align-items:center; gap:12px; padding:12px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.02);">
+              <div style="font-size:1.8rem; width:44px; height:44px; display:flex; align-items:center; justify-content:center; background:#9b59b620; border-radius:50%; flex-shrink:0;">📚</div>
+              <div>
+                <strong style="display:block; font-size:0.95rem; color:white; font-weight:700;">Book Worm</strong>
+                <span style="font-size:0.8rem; color:var(--muted);">Meminjam lebih dari 5 buku dalam periode satu semester.</span>
+              </div>
+            </div>
+
+            <div style="display:flex; align-items:center; gap:12px; padding:12px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,0.02);">
+              <div style="font-size:1.8rem; width:44px; height:44px; display:flex; align-items:center; justify-content:center; background:#f1c40f20; border-radius:50%; flex-shrink:0;">🥇</div>
+              <div>
+                <strong style="display:block; font-size:0.95rem; color:white; font-weight:700;">Library Legend</strong>
+                <span style="font-size:0.8rem; color:var(--muted);">Menembus jajaran prestisius Top 10 Leaderboard pada bulan berjalan.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. LEVELS -->
+        <div class="guide-panel" id="gpanel-levels" style="display:none;">
+          <p style="font-size:0.9rem; color:var(--muted); margin-bottom:12px;">Akumulasi XP Anda menentukan tingkatan profil level Anda:</p>
+          <div class="guide-levels-grid">
+            <div style="padding:10px; border-radius:8px; border:1px solid var(--border); text-align:center; background:rgba(255,255,255,0.02);">
+              <div style="font-weight:bold; font-size:0.9rem; color:#95a5a6;">Egg / Pengunjung</div>
+              <div style="font-size:0.75rem; color:var(--muted); margin-top:2px;">0 - 100 XP</div>
+            </div>
+            <div style="padding:10px; border-radius:8px; border:1px solid var(--border); text-align:center; background:rgba(255,255,255,0.02);">
+              <div style="font-weight:bold; font-size:0.9rem; color:#3498db;">📖 Pembaca</div>
+              <div style="font-size:0.75rem; color:var(--muted); margin-top:2px;">101 - 300 XP</div>
+            </div>
+            <div style="padding:10px; border-radius:8px; border:1px solid var(--border); text-align:center; background:rgba(255,255,255,0.02);">
+              <div style="font-weight:bold; font-size:0.9rem; color:#2ecc71;">📝 Pelajar</div>
+              <div style="font-size:0.75rem; color:var(--muted); margin-top:2px;">301 - 700 XP</div>
+            </div>
+            <div style="padding:10px; border-radius:8px; border:1px solid var(--border); text-align:center; background:rgba(255,255,255,0.02);">
+              <div style="font-weight:bold; font-size:0.9rem; color:#9b59b6;">🔬 Peneliti</div>
+              <div style="font-size:0.75rem; color:var(--muted); margin-top:2px;">701 - 1500 XP</div>
+            </div>
+            <div style="padding:10px; border-radius:8px; border:1px solid var(--border); text-align:center; background:rgba(255,255,255,0.02);">
+              <div style="font-weight:bold; font-size:0.9rem; color:#e67e22;">🎓 Cendekia</div>
+              <div style="font-size:0.75rem; color:var(--muted); margin-top:2px;">1501 - 3000 XP</div>
+            </div>
+            <div style="padding:10px; border-radius:8px; border:1px solid var(--border); text-align:center; background:rgba(255,255,255,0.02);">
+              <div style="font-weight:bold; font-size:0.9rem; color:#f1c40f;">👑 Legenda Perpus</div>
+              <div style="font-size:0.75rem; color:var(--muted); margin-top:2px;">3001+ XP</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Bind tab switching events inside Guide Modal
+  const tabBtns = container.querySelectorAll('.guide-tab-btn');
+  const panels = container.querySelectorAll('.guide-panel');
+
+  tabBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const activeTab = btn.dataset.guideTab;
+
+      // Update button visual
+      tabBtns.forEach(b => {
+        b.style.color = 'var(--muted)';
+        b.style.borderBottom = '3px solid transparent';
+        b.classList.remove('active');
+      });
+      btn.style.color = 'var(--gold)';
+      btn.style.borderBottom = '3px solid var(--gold)';
+      btn.classList.add('active');
+
+      // Update panel visibility
+      panels.forEach(p => {
+        p.style.display = 'none';
+        p.classList.remove('active');
+      });
+      const activePanel = container.querySelector(`#gpanel-${activeTab}`);
+      if (activePanel) {
+        activePanel.style.display = 'block';
+        activePanel.classList.add('active');
+      }
+    });
+  });
+
+  openModal();
+}
+
+
+function openRedeemModal(rewardId, rewardName, rewardCost, rewardStock) {
+  const container = document.getElementById('modalBody');
+  if (!container) return;
+
+  // Render Step 1: Input NIM
+  container.innerHTML = `
+    <div class="redeem-modal-wrapper" style="text-align:left; padding: 10px 5px;">
+      <h2 style="display:flex; align-items:center; gap:8px; margin-bottom:12px; font-size:1.3rem; color:var(--text); font-weight:800;">
+        <span class="material-icons-outlined" style="color:var(--gold); font-size:1.8rem;">redeem</span>
+        Tukar Poin / Redeem
+      </h2>
+      
+      <div style="background:rgba(255,184,0,0.06); padding:14px; border-radius:12px; border:1px solid rgba(255,184,0,0.15); margin-bottom:18px;">
+        <h4 style="margin:0 0 4px 0; font-size:0.95rem; color:var(--text); font-weight:700;">🎁 ${rewardName}</h4>
+        <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.82rem; color:var(--muted); margin-top:8px;">
+          <span>Biaya Penukaran: <strong style="color:var(--gold); font-size:0.9rem;">${rewardCost} XP</strong></span>
+          <span>Tersedia: <strong style="color:var(--text);">${rewardStock} unit</strong></span>
+        </div>
+      </div>
+
+      <div id="redeemStepContainer">
+        <!-- STEP 1 FORM -->
+        <form id="otpRequestForm">
+          <label style="display:block; font-size:0.82rem; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">Masukkan NIM / ID Anggota Anda:</label>
+          <div style="position:relative; margin-bottom:14px;">
+            <span class="material-icons-outlined" style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--muted); font-size:1.2rem;">badge</span>
+            <input type="text" id="redeemMemberId" placeholder="Contoh: L200220001" required 
+              style="width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:12px 12px 12px 38px; color:var(--text); font-family:inherit; font-size:0.92rem; outline:none; transition:border-color 0.2s;">
+          </div>
+          
+          <div id="redeemError" style="color:var(--red); font-size:0.8rem; font-weight:600; margin-bottom:14px; display:none;"></div>
+          
+          <button type="submit" id="btnRequestOtp" style="width:100%; background:var(--blue); border:none; color:white; padding:12px; border-radius:10px; font-family:'Inter',sans-serif; font-size:0.9rem; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; transition:background 0.2s;">
+            <span class="material-icons-outlined" style="font-size:1.2rem;">send</span> Kirim Kode OTP Verifikasi
+          </button>
+        </form>
+      </div>
+    </div>
+  `;
+
+  // Submit Handler for Step 1 (Request OTP)
+  const otpRequestForm = document.getElementById('otpRequestForm');
+  otpRequestForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const memberId = document.getElementById('redeemMemberId').value.trim();
+    const btn = document.getElementById('btnRequestOtp');
+    const errDiv = document.getElementById('redeemError');
+    
+    // UI Loading state
+    btn.disabled = true;
+    btn.innerHTML = `<span class="material-icons-outlined" style="animation: spin 1s linear infinite; display: inline-block;">sync</span> Mengirim OTP...`;
+    errDiv.style.display = 'none';
+
+    try {
+      const response = await fetch('/api/redeem/request-otp/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': CSRF_TOKEN
+        },
+        body: JSON.stringify({ member_id: memberId, reward_id: rewardId })
+      });
+
+      const result = await response.json();
+      
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Terjadi kesalahan saat meminta OTP.');
+      }
+
+      // Step 2: Show OTP Verification Form
+      renderOtpVerificationStep(memberId, result.email_masked);
+
+    } catch (error) {
+      errDiv.textContent = error.message;
+      errDiv.style.display = 'block';
+      btn.disabled = false;
+      btn.innerHTML = `<span class="material-icons-outlined" style="font-size:1.2rem;">send</span> Kirim Kode OTP Verifikasi`;
+    }
+  });
+
+  // Render Step 2: Input OTP Code
+  function renderOtpVerificationStep(memberId, maskedEmail) {
+    const stepContainer = document.getElementById('redeemStepContainer');
+    stepContainer.innerHTML = `
+      <form id="otpVerifyForm">
+        <div style="background:rgba(77,166,255,0.06); padding:12px; border-radius:10px; border:1px solid rgba(77,166,255,0.15); margin-bottom:16px; font-size:0.82rem; line-height:1.5; color:var(--text);">
+          📢 Kode verifikasi OTP telah dikirim ke email kampus Anda:<br>
+          <strong style="color:var(--blue);">${maskedEmail}</strong>
+        </div>
+
+        <label style="display:block; font-size:0.82rem; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">Masukkan 6-Digit OTP:</label>
+        <div style="position:relative; margin-bottom:14px;">
+          <span class="material-icons-outlined" style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--muted); font-size:1.2rem;">lock</span>
+          <input type="text" id="redeemOtp" maxlength="6" placeholder="******" required 
+            style="width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:12px 12px 12px 38px; color:var(--text); font-family:inherit; font-size:1.1rem; font-weight:700; letter-spacing:6px; text-align:center; outline:none; transition:border-color 0.2s;">
+        </div>
+
+        <div id="redeemError" style="color:var(--red); font-size:0.8rem; font-weight:600; margin-bottom:14px; display:none;"></div>
+
+        <div style="display:flex; gap:8px;">
+          <button type="button" id="btnBackToStep1" style="flex:1; background:var(--surface3); border:none; color:var(--text); padding:12px; border-radius:10px; font-family:inherit; font-size:0.9rem; font-weight:700; cursor:pointer; transition:background 0.2s;">Kembali</button>
+          <button type="submit" id="btnConfirmRedeem" style="flex:2; background:var(--green); border:none; color:white; padding:12px; border-radius:10px; font-family:'Inter',sans-serif; font-size:0.9rem; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; transition:background 0.2s;">
+            <span class="material-icons-outlined" style="font-size:1.2rem;">check_circle</span> Verifikasi &amp; Tukar
+          </button>
+        </div>
+      </form>
+    `;
+
+    // Back Button Handler
+    document.getElementById('btnBackToStep1').addEventListener('click', () => {
+      openRedeemModal(rewardId, rewardName, rewardCost, rewardStock);
+    });
+
+    // Verification Form Submit Handler
+    const otpVerifyForm = document.getElementById('otpVerifyForm');
+    otpVerifyForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const otpCode = document.getElementById('redeemOtp').value.trim();
+      const btn = document.getElementById('btnConfirmRedeem');
+      const errDiv = document.getElementById('redeemError');
+
+      btn.disabled = true;
+      btn.innerHTML = `<span class="material-icons-outlined" style="animation: spin 1s linear infinite; display: inline-block;">sync</span> Memverifikasi...`;
+      errDiv.style.display = 'none';
+
+      try {
+        const response = await fetch('/api/redeem/confirm/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': CSRF_TOKEN
+          },
+          body: JSON.stringify({ member_id: memberId, otp: otpCode })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+          throw new Error(result.error || 'Terjadi kesalahan saat verifikasi OTP.');
+        }
+
+        // Step 3: Show Success Screen with Coupon Code and QR Code
+        renderRedeemSuccessStep(result.code, rewardName, rewardCost, result.remaining_points);
+
+      } catch (error) {
+        errDiv.textContent = error.message;
+        errDiv.style.display = 'block';
+        btn.disabled = false;
+        btn.innerHTML = `<span class="material-icons-outlined" style="font-size:1.2rem;">check_circle</span> Verifikasi &amp; Tukar`;
+      }
+    });
+  }
+
+  // Render Step 3: Success Screen
+  function renderRedeemSuccessStep(claimCode, name, cost, remainingPoints) {
+    const stepContainer = document.getElementById('redeemStepContainer');
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${claimCode}`;
+    
+    // Trigger toast success
+    showToast('🎉', 'Penukaran poin berhasil!');
+
+    stepContainer.innerHTML = `
+      <div style="text-align:center; padding:10px 0;">
+        <div style="font-size:3rem; color:var(--green); margin-bottom:10px; animation: bounce 1.5s ease-in-out infinite;">🎉</div>
+        <h3 style="font-size:1.2rem; font-weight:800; color:var(--text); margin-bottom:6px;">Penukaran Berhasil!</h3>
+        <p style="font-size:0.85rem; color:var(--muted); margin-bottom:18px;">
+          Poin Anda telah berhasil dipotong sebanyak <strong style="color:var(--gold);">${cost} XP</strong>. Sisa poin Anda sekarang: <strong>${remainingPoints} XP</strong>.
+        </p>
+
+        <!-- QR Code -->
+        <div style="background:white; display:inline-block; padding:12px; border-radius:16px; box-shadow:0 8px 24px rgba(0,0,0,0.08); margin-bottom:16px; border:1px solid var(--border);">
+          <img src="${qrUrl}" alt="${claimCode}" style="width:150px; height:150px; display:block;">
+        </div>
+
+        <!-- Claim Code -->
+        <div style="background:var(--surface2); border:1px dashed var(--border); padding:10px; border-radius:8px; display:inline-block; font-family:monospace; font-weight:700; font-size:1.05rem; letter-spacing:1px; color:var(--text); margin-bottom:18px; width:100%;">
+          ${claimCode}
+        </div>
+
+        <p style="font-size:0.8rem; line-height:1.5; color:var(--muted); margin-bottom:20px; max-width:90%; margin-left:auto; margin-right:auto;">
+          Silakan tunjukkan Kode Unik atau QR Code di atas ke pustakawan di <strong>Meja Sirkulasi</strong> untuk pengambilan barang. Bukti penukaran juga dikirim ke email.
+        </p>
+
+        <button id="btnRedeemFinish" style="width:100%; background:var(--blue); border:none; color:white; padding:12px; border-radius:10px; font-family:inherit; font-size:0.9rem; font-weight:700; cursor:pointer; transition:background 0.2s;">Selesai</button>
+      </div>
+    `;
+
+    document.getElementById('btnRedeemFinish').addEventListener('click', () => {
+      closeModal();
+      // Reload current tab to update points / leaderboard ranking live!
+      loadTab(currentTab);
+    });
+  }
+
+  openModal();
 }
 
 // ── UTILS ──
@@ -461,7 +892,7 @@ function showToast(icon, msg, duration = 3000) {
 // ── LIVE RANK SHUFFLE DEMO ──
 // Every 10s, briefly animate two rows swapping in the student list to show "live" feel.
 setInterval(() => {
-  const list = document.getElementById('list-students-visitors');
+  const list = document.getElementById('list-student-xp');
   if (!list || currentTab !== 'students') return;
   const items = [...list.querySelectorAll('.lb-item')];
   if (items.length < 4) return;

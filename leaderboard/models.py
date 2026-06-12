@@ -1,9 +1,60 @@
 from django.db import models
 from django.contrib.auth.models import User
-import uuid
 from django.utils import timezone
 from datetime import timedelta
+import uuid
+import csv
+import io
 
+# ==========================================
+# 1. CORE / MASTER DATA
+# ==========================================
+
+class Faculty(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    code = models.CharField(max_length=20, unique=True)
+    color = models.CharField(max_length=7, default='#4da6ff')  # hex color
+
+    class Meta:
+        verbose_name_plural = 'Faculties'
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+    @property
+    def total_visitors(self):
+        return Visit.objects.filter(member__faculty=self).count()
+
+    @property
+    def total_books_borrowed(self):
+        return BorrowRecord.objects.filter(member__faculty=self).count()
+
+
+class Book(models.Model):
+    isbn = models.CharField(max_length=20, unique=True)
+    title = models.CharField(max_length=300)
+    author = models.CharField(max_length=200)
+    category = models.CharField(max_length=100)
+    faculty = models.ForeignKey(Faculty, on_delete=models.SET_NULL, null=True, blank=True, related_name='books')
+    stock = models.IntegerField(default=1)
+    cover = models.ImageField(upload_to='books/', null=True, blank=True)
+    added_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['title']
+
+    def __str__(self):
+        return self.title
+
+    @property
+    def borrow_count(self):
+        return self.borrow_records.count()
+
+
+# ==========================================
+# 2. GAMIFICATION POLICIES (RULES, LEVELS, REWARDS)
+# ==========================================
 
 class LevelTier(models.Model):
     name = models.CharField(max_length=50)
@@ -54,26 +105,24 @@ class PointPolicy(models.Model):
         return f"{self.action_type.capitalize()} = {self.points} XP"
 
 
-class Faculty(models.Model):
-    name = models.CharField(max_length=100, unique=True)
-    code = models.CharField(max_length=20, unique=True)
-    color = models.CharField(max_length=7, default='#4da6ff')  # hex color
-
+class Reward(models.Model):
+    name = models.CharField(max_length=150)
+    description = models.TextField()
+    points_cost = models.IntegerField(default=100)
+    stock = models.IntegerField(default=10)
+    image_url = models.CharField(max_length=200, blank=True)
+    is_active = models.BooleanField(default=True)
+    
     class Meta:
-        verbose_name_plural = 'Faculties'
-        ordering = ['name']
-
+        ordering = ['points_cost']
+        
     def __str__(self):
-        return self.name
+        return f"{self.name} ({self.points_cost} XP)"
 
-    @property
-    def total_visitors(self):
-        return Visit.objects.filter(member__faculty=self).count()
 
-    @property
-    def total_books_borrowed(self):
-        return BorrowRecord.objects.filter(member__faculty=self).count()
-
+# ==========================================
+# 3. USERS / MEMBERS
+# ==========================================
 
 class Member(models.Model):
     ROLE_CHOICES = [
@@ -216,26 +265,9 @@ class Member(models.Model):
         }
 
 
-class Book(models.Model):
-    isbn = models.CharField(max_length=20, unique=True)
-    title = models.CharField(max_length=300)
-    author = models.CharField(max_length=200)
-    category = models.CharField(max_length=100)
-    faculty = models.ForeignKey(Faculty, on_delete=models.SET_NULL, null=True, blank=True, related_name='books')
-    stock = models.IntegerField(default=1)
-    cover = models.ImageField(upload_to='books/', null=True, blank=True)
-    added_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ['title']
-
-    def __str__(self):
-        return self.title
-
-    @property
-    def borrow_count(self):
-        return self.borrow_records.count()
-
+# ==========================================
+# 4. TRANSACTIONS & ACTIVITIES
+# ==========================================
 
 class Visit(models.Model):
     member = models.ForeignKey(Member, on_delete=models.CASCADE, related_name='visits')
@@ -290,33 +322,6 @@ class BorrowRecord(models.Model):
             self.status = 'returned'
         super().save(*args, **kwargs)
 
-class SystemLog(models.Model):
-    timestamp = models.DateTimeField(auto_now_add=True)
-    action = models.CharField(max_length=100)
-    duration_ms = models.FloatField(default=0)
-    details = models.TextField(blank=True)
-    
-    class Meta:
-        ordering = ['-timestamp']
-        verbose_name = 'System Log'
-        verbose_name_plural = 'System Logs'
-        
-    def __str__(self):
-        return f"[{self.timestamp.strftime('%Y-%m-%d %H:%M:%S')}] {self.action} ({self.duration_ms}ms)"
-
-class Reward(models.Model):
-    name = models.CharField(max_length=150)
-    description = models.TextField()
-    points_cost = models.IntegerField(default=100)
-    stock = models.IntegerField(default=10)
-    image_url = models.CharField(max_length=200, blank=True)
-    is_active = models.BooleanField(default=True)
-    
-    class Meta:
-        ordering = ['points_cost']
-        
-    def __str__(self):
-        return f"{self.name} ({self.points_cost} XP)"
 
 class PointTransaction(models.Model):
     TYPE_CHOICES = [
@@ -338,8 +343,69 @@ class PointTransaction(models.Model):
         return f"{self.cardnumber} | {self.amount} ({self.transaction_type})"
 
 
-import csv
-import io
+class RedemptionClaim(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pending / Belum Diambil'),
+        ('claimed', 'Claimed / Sudah Diambil'),
+    ]
+    code = models.CharField(max_length=50, unique=True, db_index=True)
+    member = models.ForeignKey(Member, on_delete=models.CASCADE, related_name='redemptions')
+    reward = models.ForeignKey(Reward, on_delete=models.CASCADE, related_name='redemptions')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    created_at = models.DateTimeField(auto_now_add=True)
+    claimed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.code} — {self.member.name} ({self.status})"
+
+
+# ==========================================
+# 5. SEMINAR MODULE
+# ==========================================
+
+class Seminar(models.Model):
+    title = models.CharField(max_length=200, help_text="Judul Seminar")
+    speaker = models.CharField(max_length=100, help_text="Pembicara/Narasumber")
+    description = models.TextField(blank=True, null=True, help_text="Deskripsi Singkat Seminar")
+    date = models.DateTimeField(help_text="Tanggal & Waktu Seminar")
+    registration_open = models.DateTimeField(help_text="Tanggal Dibuka Pendaftaran")
+    registration_close = models.DateTimeField(help_text="Tanggal Ditutup Pendaftaran")
+    points_register = models.IntegerField(default=2, help_text="Poin untuk mendaftar")
+    points_attend = models.IntegerField(default=15, help_text="Poin untuk kehadiran")
+    claim_code = models.CharField(max_length=50, unique=True, help_text="Kode Unik Klaim Kehadiran (misal: UMS-SEM-XYZ)")
+    claim_code_active = models.BooleanField(default=False, help_text="Apakah klaim kehadiran sedang aktif")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-date']
+
+    def __str__(self):
+        return f"{self.title} ({self.date.strftime('%d %b %Y')})"
+
+
+class SeminarRegistration(models.Model):
+    STATUS_CHOICES = [
+        ('registered', 'Terdaftar'),
+        ('attended', 'Hadir / Diklaim'),
+    ]
+    seminar = models.ForeignKey(Seminar, on_delete=models.CASCADE, related_name='registrations')
+    member_id = models.CharField(max_length=50, db_index=True, help_text="NIM / Cardnumber")
+    email = models.EmailField(max_length=254, help_text="Email Mahasiswa saat mendaftar")
+    registered_at = models.DateTimeField(auto_now_add=True)
+    attended_at = models.DateTimeField(null=True, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='registered')
+
+    class Meta:
+        ordering = ['-registered_at']
+        unique_together = ('seminar', 'member_id')
+
+    def __str__(self):
+        return f"{self.member_id} - {self.seminar.title} ({self.status})"
+
+
 class SeminarUpload(models.Model):
     title = models.CharField(max_length=200, help_text="Nama atau Judul Seminar")
     csv_file = models.FileField(upload_to='seminars/', help_text="Upload file CSV berisi satu kolom NIM/Cardnumber", blank=True, null=True)
@@ -419,62 +485,20 @@ class SeminarUpload(models.Model):
                 print(f"Error processing Seminar Input: {e}")
 
 
-class RedemptionClaim(models.Model):
-    STATUS_CHOICES = [
-        ('pending', 'Pending / Belum Diambil'),
-        ('claimed', 'Claimed / Sudah Diambil'),
-    ]
-    code = models.CharField(max_length=50, unique=True, db_index=True)
-    member = models.ForeignKey(Member, on_delete=models.CASCADE, related_name='redemptions')
-    reward = models.ForeignKey(Reward, on_delete=models.CASCADE, related_name='redemptions')
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
-    created_at = models.DateTimeField(auto_now_add=True)
-    claimed_at = models.DateTimeField(null=True, blank=True)
+# ==========================================
+# 6. SYSTEM LOGS
+# ==========================================
 
+class SystemLog(models.Model):
+    timestamp = models.DateTimeField(auto_now_add=True)
+    action = models.CharField(max_length=100)
+    duration_ms = models.FloatField(default=0)
+    details = models.TextField(blank=True)
+    
     class Meta:
-        ordering = ['-created_at']
-
+        ordering = ['-timestamp']
+        verbose_name = 'System Log'
+        verbose_name_plural = 'System Logs'
+        
     def __str__(self):
-        return f"{self.code} — {self.member.name} ({self.status})"
-
-
-class Seminar(models.Model):
-    title = models.CharField(max_length=200, help_text="Judul Seminar")
-    speaker = models.CharField(max_length=100, help_text="Pembicara/Narasumber")
-    description = models.TextField(blank=True, null=True, help_text="Deskripsi Singkat Seminar")
-    date = models.DateTimeField(help_text="Tanggal & Waktu Seminar")
-    registration_open = models.DateTimeField(help_text="Tanggal Dibuka Pendaftaran")
-    registration_close = models.DateTimeField(help_text="Tanggal Ditutup Pendaftaran")
-    points_register = models.IntegerField(default=2, help_text="Poin untuk mendaftar")
-    points_attend = models.IntegerField(default=15, help_text="Poin untuk kehadiran")
-    claim_code = models.CharField(max_length=50, unique=True, help_text="Kode Unik Klaim Kehadiran (misal: UMS-SEM-XYZ)")
-    claim_code_active = models.BooleanField(default=False, help_text="Apakah klaim kehadiran sedang aktif")
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ['-date']
-
-    def __str__(self):
-        return f"{self.title} ({self.date.strftime('%d %b %Y')})"
-
-
-class SeminarRegistration(models.Model):
-    STATUS_CHOICES = [
-        ('registered', 'Terdaftar'),
-        ('attended', 'Hadir / Diklaim'),
-    ]
-    seminar = models.ForeignKey(Seminar, on_delete=models.CASCADE, related_name='registrations')
-    member_id = models.CharField(max_length=50, db_index=True, help_text="NIM / Cardnumber")
-    email = models.EmailField(max_length=254, help_text="Email Mahasiswa saat mendaftar")
-    registered_at = models.DateTimeField(auto_now_add=True)
-    attended_at = models.DateTimeField(null=True, blank=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='registered')
-
-    class Meta:
-        ordering = ['-registered_at']
-        unique_together = ('seminar', 'member_id')
-
-    def __str__(self):
-        return f"{self.member_id} - {self.seminar.title} ({self.status})"
-
-
+        return f"[{self.timestamp.strftime('%Y-%m-%d %H:%M:%S')}] {self.action} ({self.duration_ms}ms)"

@@ -1,5 +1,7 @@
 from django.contrib import admin
 from unfold.admin import ModelAdmin
+from unfold.decorators import display
+from django.utils.html import format_html
 from .models import Member, Faculty, Book, LevelTier, BadgeRule, PointPolicy, SystemLog, Reward, PointTransaction, RedemptionClaim, Seminar, SeminarRegistration
 
 # Visit and BorrowRecord models are no longer managed by Django ORM!
@@ -8,8 +10,17 @@ from .models import Member, Faculty, Book, LevelTier, BadgeRule, PointPolicy, Sy
 
 @admin.register(LevelTier)
 class LevelTierAdmin(ModelAdmin):
-    list_display = ['name', 'level_num', 'min_xp', 'max_xp', 'color']
+    list_display = ['name', 'level_num', 'min_xp', 'max_xp', 'color_badge']
     ordering = ['min_xp']
+    fieldsets = (
+        ('Informasi Level', {'fields': ('name', 'level_num')}),
+        ('Kriteria XP', {'fields': ('min_xp', 'max_xp')}),
+        ('Visual', {'fields': ('color',)}),
+    )
+
+    @display(description='Warna')
+    def color_badge(self, obj):
+        return format_html('<span style="background-color: {}; padding: 4px 8px; border-radius: 4px; color: #fff; font-weight: bold;">{}</span>', obj.color, obj.color)
 
 @admin.register(BadgeRule)
 class BadgeRuleAdmin(ModelAdmin):
@@ -22,9 +33,19 @@ class PointPolicyAdmin(ModelAdmin):
 
 @admin.register(Reward)
 class RewardAdmin(ModelAdmin):
-    list_display = ['name', 'points_cost', 'stock', 'is_active']
-    list_editable = ['stock', 'is_active', 'points_cost']
+    list_display = ['name', 'points_cost', 'stock', 'status_label']
+    list_editable = ['stock', 'points_cost']
     search_fields = ['name']
+    fieldsets = (
+        ('Informasi Barang', {'fields': ('name', 'description', 'image_url')}),
+        ('Pengaturan Stok & Harga', {'fields': ('points_cost', 'stock', 'is_active')}),
+    )
+
+    @display(description='Status', label=True)
+    def status_label(self, obj):
+        if not obj.is_active: return "Inactive"
+        if obj.stock <= 0: return "Out of Stock"
+        return "Available"
 
 @admin.register(PointTransaction)
 class PointTransactionAdmin(ModelAdmin):
@@ -70,8 +91,13 @@ class SystemLogAdmin(ModelAdmin):
 
 @admin.register(Faculty)
 class FacultyAdmin(ModelAdmin):
-    list_display = ('code', 'name', 'color')
+    list_display = ('code', 'name', 'color_badge')
     search_fields = ('code', 'name')
+
+    @display(description='Warna Tema')
+    def color_badge(self, obj):
+        if not obj.color: return '-'
+        return format_html('<span style="background-color: {}; padding: 4px 8px; border-radius: 4px; color: #fff; font-weight: bold;">{}</span>', obj.color, obj.color)
 
 @admin.register(Member)
 class MemberAdmin(ModelAdmin):
@@ -92,10 +118,18 @@ class BookAdmin(ModelAdmin):
 
 @admin.register(RedemptionClaim)
 class RedemptionClaimAdmin(ModelAdmin):
-    list_display = ['code', 'member', 'reward', 'status', 'created_at', 'claimed_at']
+    list_display = ['code', 'member', 'reward', 'status_badge', 'created_at', 'claimed_at']
     list_filter = ['status']
     search_fields = ['code', 'member__member_id', 'member__name', 'reward__name']
     actions = ['mark_as_claimed']
+    fieldsets = (
+        ('Informasi Penukaran', {'fields': ('code', 'member', 'reward')}),
+        ('Status', {'fields': ('status', 'claimed_at')}),
+    )
+
+    @display(description='Status', label=True)
+    def status_badge(self, obj):
+        return "Claimed" if obj.status == 'claimed' else "Pending"
 
     @admin.action(description="Mark selected claims as Claimed / Sudah Diambil")
     def mark_as_claimed(self, request, queryset):
@@ -106,10 +140,19 @@ class RedemptionClaimAdmin(ModelAdmin):
 
 @admin.register(Seminar)
 class SeminarAdmin(ModelAdmin):
-    list_display = ('title', 'speaker', 'date', 'points_register', 'points_attend', 'claim_code', 'claim_code_active')
+    list_display = ('title', 'speaker', 'date', 'points_register', 'points_attend', 'claim_code', 'code_status')
     list_filter = ('claim_code_active', 'date')
     search_fields = ('title', 'speaker', 'claim_code')
     actions = ['activate_claim_code', 'deactivate_claim_code']
+    fieldsets = (
+        ('Informasi Umum', {'fields': ('title', 'description', 'speaker', 'date', 'image_url')}),
+        ('Pengaturan Poin', {'fields': ('points_register', 'points_attend')}),
+        ('Kode Klaim Kehadiran', {'fields': ('claim_code', 'claim_code_active')}),
+    )
+
+    @display(description='Status Kode', boolean=True)
+    def code_status(self, obj):
+        return obj.claim_code_active
 
     @admin.action(description="Aktifkan Klaim Kode Kehadiran")
     def activate_claim_code(self, request, queryset):
@@ -124,10 +167,14 @@ class SeminarAdmin(ModelAdmin):
 
 @admin.register(SeminarRegistration)
 class SeminarRegistrationAdmin(ModelAdmin):
-    list_display = ('member_id', 'get_member_name', 'seminar', 'email', 'registered_at', 'attended_at', 'status')
+    list_display = ('member_id', 'get_member_name', 'seminar', 'email', 'registered_at', 'attended_at', 'status_badge')
     list_filter = ('status', 'seminar')
     search_fields = ('member_id', 'email', 'seminar__title')
     actions = ['mark_as_attended']
+
+    @display(description='Status', label=True)
+    def status_badge(self, obj):
+        return "Attended" if obj.status == 'attended' else "Registered"
 
     def get_member_name(self, obj):
         member = Member.objects.filter(member_id=obj.member_id).first()
@@ -161,3 +208,11 @@ class SeminarRegistrationAdmin(ModelAdmin):
         cache.clear()
         
         self.message_user(request, f"{count} peserta berhasil ditandai sebagai hadir dan poin ditambahkan.")
+
+from .models import APIKey
+
+@admin.register(APIKey)
+class APIKeyAdmin(ModelAdmin):
+    list_display = ['name', 'key', 'is_active', 'created_at', 'last_used']
+    list_filter = ['is_active']
+    search_fields = ['name', 'key']

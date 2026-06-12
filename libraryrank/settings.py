@@ -202,6 +202,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 # UNFOLD ADMIN SETTINGS
 from django.templatetags.static import static
+from django.urls import reverse_lazy
 
 UNFOLD = {
     'SITE_TITLE': 'LibraryRank Admin',
@@ -221,6 +222,114 @@ UNFOLD = {
             '900': '#094340',
             '950': '#052927',
         },
+    },
+    "SIDEBAR": {
+        "show_search": True,
+        "show_all_applications": False,
+        "navigation": [
+            {
+                "title": "Pangkalan Data",
+                "separator": True,
+                "items": [
+                    {
+                        "title": "Members (Anggota)",
+                        "icon": "people",
+                        "link": reverse_lazy("admin:leaderboard_member_changelist"),
+                    },
+                    {
+                        "title": "Faculties (Fakultas)",
+                        "icon": "account_balance",
+                        "link": reverse_lazy("admin:leaderboard_faculty_changelist"),
+                    },
+                    {
+                        "title": "Books (Buku)",
+                        "icon": "menu_book",
+                        "link": reverse_lazy("admin:leaderboard_book_changelist"),
+                    },
+                ],
+            },
+            {
+                "title": "Aturan Main & Gamifikasi",
+                "separator": True,
+                "items": [
+                    {
+                        "title": "Level & Tiers",
+                        "icon": "leaderboard",
+                        "link": reverse_lazy("admin:leaderboard_leveltier_changelist"),
+                    },
+                    {
+                        "title": "Badge & Penghargaan",
+                        "icon": "military_tech",
+                        "link": reverse_lazy("admin:leaderboard_badgerule_changelist"),
+                    },
+                    {
+                        "title": "Kebijakan Poin XP",
+                        "icon": "rule",
+                        "link": reverse_lazy("admin:leaderboard_pointpolicy_changelist"),
+                    },
+                ],
+            },
+            {
+                "title": "Event & Riwayat Poin",
+                "separator": True,
+                "items": [
+                    {
+                        "title": "Daftar Event / Seminar",
+                        "icon": "event",
+                        "link": reverse_lazy("admin:leaderboard_seminar_changelist"),
+                    },
+                    {
+                        "title": "Pendaftaran Peserta",
+                        "icon": "how_to_reg",
+                        "link": reverse_lazy("admin:leaderboard_seminarregistration_changelist"),
+                        "badge": "leaderboard.badges.get_pending_registrations",
+                    },
+                    {
+                        "title": "Upload Kehadiran (CSV)",
+                        "icon": "upload_file",
+                        "link": reverse_lazy("admin:leaderboard_seminarupload_changelist"),
+                    },
+                    {
+                        "title": "Riwayat Transaksi Poin",
+                        "icon": "receipt_long",
+                        "link": reverse_lazy("admin:leaderboard_pointtransaction_changelist"),
+                    },
+                ],
+            },
+            {
+                "title": "Merchandise & Redeem",
+                "separator": True,
+                "items": [
+                    {
+                        "title": "Daftar Merchandise",
+                        "icon": "card_giftcard",
+                        "link": reverse_lazy("admin:leaderboard_reward_changelist"),
+                    },
+                    {
+                        "title": "Klaim Hadiah (Redeem)",
+                        "icon": "redeem",
+                        "link": reverse_lazy("admin:leaderboard_redemptionclaim_changelist"),
+                        "badge": "leaderboard.badges.get_pending_claims",
+                    },
+                ],
+            },
+            {
+                "title": "Sistem & Integrasi API",
+                "separator": True,
+                "items": [
+                    {
+                        "title": "API Keys",
+                        "icon": "vpn_key",
+                        "link": reverse_lazy("admin:leaderboard_apikey_changelist"),
+                    },
+                    {
+                        "title": "Log Sistem (Error)",
+                        "icon": "bug_report",
+                        "link": reverse_lazy("admin:leaderboard_systemlog_changelist"),
+                    },
+                ],
+            },
+        ],
     },
     "TABS": [
         {

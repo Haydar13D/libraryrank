@@ -54,6 +54,7 @@ function bindControls() {
     searchTimer = setTimeout(() => {
       currentSearch = e.target.value;
       loadTab(currentTab);
+      updateQuickSearch(currentSearch);
     }, 350);
   });
 
@@ -133,6 +134,46 @@ async function fetchOverview(params) {
   } catch (e) { console.error(e); }
 }
 
+async function updateQuickSearch(q) {
+  const quickCard = document.getElementById('searchResultQuick');
+  if (!quickCard) return;
+  if (!q || q.length < 3) {
+    quickCard.style.display = 'none';
+    return;
+  }
+  
+  try {
+    const params = new URLSearchParams({ q: q });
+    const res = await fetch(`/api/overview/?${params}`);
+    const data = await res.json();
+    if (data.leaderboard && data.leaderboard.length > 0) {
+      const p = data.leaderboard[0];
+      
+      // If we find an exact match on NIM or Name, or just show the top result if it's very relevant
+      // We will just show the top result if it exists.
+      document.getElementById('quickName').textContent = p.name;
+      document.getElementById('quickFaculty').textContent = p.id + ' • ' + (p.faculty || '');
+      document.getElementById('quickXP').textContent = p.visits + ' XP';
+      document.getElementById('quickAvatar').textContent = p.initials;
+      
+      const role = p.role || 'student';
+      const { bg, text } = ROLE_COLORS[role] || ROLE_COLORS.student;
+      document.getElementById('quickAvatar').style.background = bg;
+      document.getElementById('quickAvatar').style.color = text;
+      
+      quickCard.style.display = 'flex';
+      quickCard.onclick = () => fetchMemberDetail(p.id, role);
+      quickCard.style.cursor = 'pointer';
+      
+      // Hover effect
+      quickCard.onmouseenter = () => quickCard.style.transform = 'translateY(-2px)';
+      quickCard.onmouseleave = () => quickCard.style.transform = 'translateY(0)';
+    } else {
+      quickCard.style.display = 'none';
+    }
+  } catch(e) {}
+}
+
 async function fetchRole(role, params) {
   try {
     const res = await fetch(`/api/pemustaka-teraktif/?role=${role}&${params}`);
@@ -196,14 +237,22 @@ function renderChart(data) {
   if (overviewChartInstance) overviewChartInstance.destroy();
   
   overviewChartInstance = new Chart(ctx, {
-    type: 'bar',
+    type: 'line',
     data: {
       labels: ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'],
       datasets: [{
         label: 'Kunjungan Harian',
         data: dataPoints,
-        backgroundColor: '#FFB800',
-        borderRadius: 4
+        borderColor: 'var(--primary, #818CF8)',
+        backgroundColor: 'rgba(129, 140, 248, 0.15)',
+        fill: true,
+        tension: 0.4,
+        borderWidth: 3,
+        pointBackgroundColor: 'var(--primary, #818CF8)',
+        pointBorderColor: 'var(--surface, #fff)',
+        pointBorderWidth: 2,
+        pointRadius: 4,
+        pointHoverRadius: 6
       }]
     },
     options: {

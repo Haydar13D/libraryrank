@@ -1,6 +1,8 @@
 
 from django.urls import path
+from django.views.generic import TemplateView
 from . import views
+from . import integration_views
 
 app_name = 'leaderboard'
 
@@ -23,6 +25,13 @@ urlpatterns = [
     path('api/seminar/list/', views.api_seminar_list, name='api_seminar_list'),
     path('api/seminar/register/', views.api_register_seminar, name='api_register_seminar'),
     path('api/seminar/claim/', views.api_claim_seminar_attendance, name='api_claim_seminar_attendance'),
+
+    # Public Integration API (Secured by API Key)
+    path('api/docs/', TemplateView.as_view(template_name='leaderboard/swagger.html'), name='swagger_ui'),
+    path('api/v1/member/<str:member_id>/', integration_views.integration_member_detail, name='integration_member_detail'),
+    path('api/v1/member/<str:member_id>/add_points/', integration_views.integration_add_points, name='integration_add_points'),
+    path('api/v1/rewards/', integration_views.integration_rewards, name='integration_rewards'),
+    path('api/v1/redeem/', integration_views.integration_redeem, name='integration_redeem'),
 
     # Exports
     path('export/excel/', views.export_excel, name='export_excel'),

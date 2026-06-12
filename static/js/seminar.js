@@ -72,10 +72,10 @@ function renderSeminarCards(seminars) {
   const container = document.getElementById('seminarContainer');
   if (seminars.length === 0) {
     container.innerHTML = `
-      <div style="grid-column: 1/-1; text-align: center; padding: 60px; background: var(--bg-card); border-radius: 12px; border: 1px dashed var(--border);">
-        <span class="material-icons-outlined" style="font-size: 3rem; color: var(--muted); margin-bottom: 12px;">event_note</span>
-        <h4 style="color: white; margin-bottom: 4px;">Belum Ada Seminar Aktif</h4>
-        <p style="color: var(--muted); font-size: 0.85rem;">Tidak ada jadwal seminar yang terdaftar untuk 30 hari terakhir atau mendatang.</p>
+      <div style="grid-column: 1/-1; text-align: center; padding: 48px; background: var(--surface); border-radius: var(--radius); border: 1px dashed var(--border);">
+        <span class="material-icons-outlined" style="font-size: 2.5rem; color: var(--muted); margin-bottom: 10px;">event_note</span>
+        <h4 style="color: var(--text); margin-bottom: 4px; font-size: 0.95rem;">Belum Ada Seminar Aktif</h4>
+        <p style="color: var(--muted); font-size: 0.82rem;">Tidak ada jadwal seminar yang terdaftar untuk 30 hari terakhir atau mendatang.</p>
       </div>
     `;
     return;
@@ -86,46 +86,46 @@ function renderSeminarCards(seminars) {
     let badgeHtml = '';
 
     if (sem.reg_status === 'attended') {
-      badgeHtml = `<span style="background: rgba(61,224,138,0.15); color: #3de08a; padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 800; display: inline-flex; align-items: center; gap: 4px;"><span class="live-dot" style="background:#3de08a; animation:none; position:static; display:inline-block; margin:0;"></span>HADIR (Kehadiran Terkonfirmasi)</span>`;
-      buttonHtml = `<button disabled style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(61,224,138,0.3); background: rgba(61,224,138,0.05); color: #3de08a; font-weight: 700; font-size: 0.85rem;">Selesai (Sudah Diklaim)</button>`;
+      badgeHtml = `<span style="background: rgba(16,185,129,0.1); color: var(--green); padding: 4px 10px; border-radius: 4px; font-size: 0.72rem; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;"><span class="live-dot" style="background:var(--green); animation:none; position:static; display:inline-block; margin:0;"></span>HADIR</span>`;
+      buttonHtml = `<button disabled style="width: 100%; padding: 9px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface2); color: var(--muted); font-family: 'Inter', sans-serif; font-weight: 600; font-size: 0.82rem;">Selesai (Sudah Diklaim)</button>`;
     } else if (sem.reg_status === 'registered') {
-      badgeHtml = `<span style="background: rgba(77,166,255,0.15); color: #4da6ff; padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 800; display: inline-flex; align-items: center; gap: 4px;"><span class="material-icons-outlined" style="font-size:0.95rem;">assignment</span> TERDAFTAR (Menunggu Hari-H)</span>`;
+      badgeHtml = `<span style="background: rgba(47,49,133,0.08); color: var(--primary); padding: 4px 10px; border-radius: 4px; font-size: 0.72rem; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;"><span class="material-icons-outlined" style="font-size:0.85rem;">assignment</span> TERDAFTAR</span>`;
       
       if (sem.claim_code_active) {
-        buttonHtml = `<button onclick="goToClaimTab('${sem.id}')" style="width: 100%; padding: 10px; border-radius: 8px; border: none; background: var(--gold); color: #1c1d3f; font-weight: 800; cursor: pointer; font-size: 0.85rem; transition: transform 0.2s;">Klaim Kehadiran Sekarang</button>`;
+        buttonHtml = `<button onclick="goToClaimTab('${sem.id}')" style="width: 100%; padding: 9px; border-radius: 8px; border: none; background: var(--primary); color: #fff; font-family: 'Inter', sans-serif; font-weight: 600; cursor: pointer; font-size: 0.82rem;">Klaim Kehadiran Sekarang</button>`;
       } else {
-        buttonHtml = `<button disabled style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: rgba(255,255,255,0.02); color: var(--muted); font-weight: 700; font-size: 0.85rem;">Terdaftar (Klaim Hari-H)</button>`;
+        buttonHtml = `<button disabled style="width: 100%; padding: 9px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface2); color: var(--muted); font-family: 'Inter', sans-serif; font-weight: 600; font-size: 0.82rem;">Terdaftar (Klaim Hari-H)</button>`;
       }
     } else {
       // not_registered
       if (sem.is_upcoming) {
-        badgeHtml = `<span style="background: rgba(255,255,255,0.05); color: var(--muted); padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;"><span class="material-icons-outlined" style="font-size:0.95rem;">schedule</span> BELUM DIBUKA (Buka H-3)</span>`;
-        buttonHtml = `<button disabled style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: rgba(255,255,255,0.02); color: var(--muted); font-weight: 700; font-size: 0.85rem;">Pendaftaran Belum Dibuka</button>`;
+        badgeHtml = `<span style="background: var(--surface2); color: var(--muted); padding: 4px 10px; border-radius: 4px; font-size: 0.72rem; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;"><span class="material-icons-outlined" style="font-size:0.85rem;">schedule</span> BELUM DIBUKA</span>`;
+        buttonHtml = `<button disabled style="width: 100%; padding: 9px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface2); color: var(--muted); font-family: 'Inter', sans-serif; font-weight: 600; font-size: 0.82rem;">Pendaftaran Belum Dibuka</button>`;
       } else if (sem.is_closed) {
-        badgeHtml = `<span style="background: rgba(255,92,92,0.1); color: #ff5c5c; padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;"><span class="material-icons-outlined" style="font-size:0.95rem; color:#ff5c5c;">cancel</span> PENDAFTARAN DITUTUP</span>`;
-        buttonHtml = `<button disabled style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,92,92,0.2); background: rgba(255,92,92,0.02); color: #ff5c5c; font-weight: 700; font-size: 0.85rem;">Tutup</button>`;
+        badgeHtml = `<span style="background: rgba(239,68,68,0.08); color: var(--red); padding: 4px 10px; border-radius: 4px; font-size: 0.72rem; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;"><span class="material-icons-outlined" style="font-size:0.85rem;">cancel</span> DITUTUP</span>`;
+        buttonHtml = `<button disabled style="width: 100%; padding: 9px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface2); color: var(--muted); font-family: 'Inter', sans-serif; font-weight: 600; font-size: 0.82rem;">Tutup</button>`;
       } else if (sem.is_open) {
-        badgeHtml = `<span style="background: rgba(245,200,66,0.15); color: var(--gold); padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 800; display: inline-flex; align-items: center; gap: 4px;"><span class="live-dot" style="background:var(--gold); position:static; display:inline-block; margin:0;"></span>PENDAFTARAN DIBUKA</span>`;
-        buttonHtml = `<button onclick="openRegModal('${sem.id}', '${escapeHtml(sem.title)}')" style="width: 100%; padding: 10px; border-radius: 8px; border: none; background: linear-gradient(90deg, #4DA6FF 0%, #3B82F6 100%); color: white; font-weight: 800; cursor: pointer; font-size: 0.85rem; transition: transform 0.2s;">Daftar Seminar (+${sem.points_register} XP)</button>`;
+        badgeHtml = `<span style="background: rgba(16,185,129,0.08); color: var(--green); padding: 4px 10px; border-radius: 4px; font-size: 0.72rem; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;"><span class="live-dot" style="background:var(--green); position:static; display:inline-block; margin:0;"></span>PENDAFTARAN DIBUKA</span>`;
+        buttonHtml = `<button onclick="openRegModal('${sem.id}', '${escapeHtml(sem.title)}')" style="width: 100%; padding: 9px; border-radius: 8px; border: none; background: var(--primary); color: #fff; font-family: 'Inter', sans-serif; font-weight: 600; cursor: pointer; font-size: 0.82rem;">Daftar Seminar (+${sem.points_register} XP)</button>`;
       }
     }
 
     return `
-      <div class="card-block" style="background: var(--bg-card); border-radius: 12px; padding: 20px; border: 1px solid ${sem.reg_status !== 'not_registered' ? 'rgba(77,166,255,0.25)' : 'var(--border)'}; display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.2s, box-shadow 0.2s; position: relative;">
+      <div class="card-block" style="border-radius: var(--radius); padding: 18px; border: 1px solid ${sem.reg_status !== 'not_registered' ? 'var(--primary)' : 'var(--border)'}; display: flex; flex-direction: column; justify-content: space-between; transition: border-color 0.15s;">
         <div>
-          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; flex-wrap: wrap; gap: 6px;">
             ${badgeHtml}
-            <span style="font-size: 0.75rem; color: var(--gold); font-weight: 700; border: 1px solid rgba(255,215,0,0.2); padding: 3px 8px; border-radius: 4px; background: rgba(255,215,0,0.03); display: inline-flex; align-items: center; gap: 3px;"><span class="material-icons-outlined" style="font-size:0.95rem; color:var(--gold);">stars</span> +${sem.points_attend} XP Kehadiran</span>
+            <span style="font-size: 0.72rem; color: var(--muted); font-weight: 600; border: 1px solid var(--border); padding: 3px 8px; border-radius: 4px; display: inline-flex; align-items: center; gap: 3px;"><span class="material-icons-outlined" style="font-size:0.82rem;">stars</span> +${sem.points_attend} XP</span>
           </div>
-          <h4 style="font-size: 1.05rem; font-weight: 700; color: white; margin-bottom: 6px; line-height: 1.4;">${sem.title}</h4>
-          <div style="font-size: 0.82rem; color: var(--muted); margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
-            <span class="material-icons-outlined" style="font-size: 1rem; color: var(--gold);">person</span> <strong>Speaker:</strong> ${sem.speaker}
+          <h4 style="font-size: 0.95rem; font-weight: 700; color: var(--text); margin-bottom: 6px; line-height: 1.4;">${sem.title}</h4>
+          <div style="font-size: 0.78rem; color: var(--muted); margin-bottom: 3px; display: flex; align-items: center; gap: 5px;">
+            <span class="material-icons-outlined" style="font-size: 0.9rem; color: var(--muted);">person</span> <strong>Speaker:</strong> ${sem.speaker}
           </div>
-          <div style="font-size: 0.82rem; color: var(--muted); margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
-            <span class="material-icons-outlined" style="font-size: 1rem; color: var(--gold);">schedule</span> <strong>Waktu:</strong> ${sem.date_formatted}
+          <div style="font-size: 0.78rem; color: var(--muted); margin-bottom: 10px; display: flex; align-items: center; gap: 5px;">
+            <span class="material-icons-outlined" style="font-size: 0.9rem; color: var(--muted);">schedule</span> <strong>Waktu:</strong> ${sem.date_formatted}
           </div>
-          <p style="font-size: 0.8rem; color: var(--muted); line-height: 1.5; margin-bottom: 20px;">
-            ${sem.description || 'Tidak ada deskripsi singkat.'}
+          <p style="font-size: 0.78rem; color: var(--muted); line-height: 1.5; margin-bottom: 16px;">
+            ${sem.description || 'Tidak ada deskripsi.'}
           </p>
         </div>
         <div>

@@ -1,0 +1,219 @@
+openapi: 3.0.0
+info:
+  title: UMSLibrary Leaderboard API
+  description: Public Integration API for UMSLibrary Leaderboard.
+  version: 1.0.0
+servers:
+  - url: /api/v1
+    description: Production Server
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: 'Enter your API key in the format: Bearer <API_KEY>'
+
+security:
+  - ApiKeyAuth: []
+
+paths:
+  /member/{member_id}/:
+    get:
+      summary: Get Member Details
+      description: Retrieve the total XP, rank, and badges for a specific member by their NIM or ID.
+      tags:
+        - Member
+      parameters:
+        - in: path
+          name: member_id
+          required: true
+          schema:
+            type: string
+          description: NIM or Member ID (e.g., L200220001)
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      member_id:
+                        type: string
+                        example: L200220001
+                      name:
+                        type: string
+                        example: BUDI SANTOSO
+                      role:
+                        type: string
+                        example: student
+                      faculty:
+                        type: string
+                        example: FAKULTAS KOMUNIKASI DAN INFORMATIKA
+                      total_xp:
+                        type: integer
+                        example: 1500
+                      total_books:
+                        type: integer
+                        example: 12
+                      level:
+                        type: string
+                        example: Gold
+                      badges_count:
+                        type: integer
+                        example: 3
+                      badges:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            name:
+                              type: string
+                              example: First Visit
+                            desc:
+                              type: string
+                              example: Datang pertama kali
+        '404':
+          description: Member not found
+
+  /member/{member_id}/add_points/:
+    post:
+      summary: Add Points to Member
+      description: Directly add points (XP) to a member. Useful for external event integrations.
+      tags:
+        - Member
+      parameters:
+        - in: path
+          name: member_id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - amount
+              properties:
+                amount:
+                  type: integer
+                  description: Amount of XP to add
+                  example: 50
+                description:
+                  type: string
+                  description: Reason for adding points
+                  example: "Menang Lomba UI/UX Design"
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Successfully added 50 XP to L200220001."
+                  new_total_xp:
+                    type: integer
+                    example: 1550
+        '400':
+          description: Invalid request body
+
+  /rewards/:
+    get:
+      summary: List Rewards
+      description: Get a list of all active rewards and their stock availability.
+      tags:
+        - Rewards
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          example: 1
+                        name:
+                          type: string
+                          example: "Tumbler Eksklusif UMS"
+                        points_cost:
+                          type: integer
+                          example: 500
+                        stock:
+                          type: integer
+                          example: 10
+                        is_available:
+                          type: boolean
+                          example: true
+
+  /redeem/:
+    post:
+      summary: Redeem Reward
+      description: Redeem a reward directly for a member without email OTP.
+      tags:
+        - Rewards
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - member_id
+                - reward_id
+              properties:
+                member_id:
+                  type: string
+                  example: "L200220001"
+                reward_id:
+                  type: integer
+                  example: 1
+      responses:
+        '200':
+          description: Successful redemption
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Redemption successful."
+                  claim_code:
+                    type: string
+                    example: "API-REDEEM-A1B2C3"
+                  remaining_points:
+                    type: integer
+                    example: 1050
+        '400':
+          description: Insufficient points or out of stock
+        '404':
+          description: Member or reward not found

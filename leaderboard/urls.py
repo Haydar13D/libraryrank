@@ -25,6 +25,7 @@ urlpatterns = [
     path('api/seminar/list/', views.api_seminar_list, name='api_seminar_list'),
     path('api/seminar/register/', views.api_register_seminar, name='api_register_seminar'),
     path('api/seminar/claim/', views.api_claim_seminar_attendance, name='api_claim_seminar_attendance'),
+    path('api/admin/badges/', views.api_admin_badges, name='api_admin_badges'),
 
     # Public Integration API (Secured by API Key)
     path('api/docs/', TemplateView.as_view(template_name='leaderboard/swagger.html'), name='swagger_ui'),

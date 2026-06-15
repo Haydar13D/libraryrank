@@ -192,7 +192,8 @@ def get_live_members(date_from, date_to, search_q=None):
     # Manual Points from Transactions
     try:
         from django.db.models import Sum, Count
-        pt_qs = PointTransaction.objects.values('cardnumber', 'transaction_type').annotate(total=Sum('amount'), cnt=Count('id'))
+        from .models import RedemptionClaim
+        pt_qs = PointTransaction.objects.filter(created_at__gte=date_from).values('cardnumber', 'transaction_type').annotate(total=Sum('amount'), cnt=Count('id'))
         local_points = {}
         seminar_counts = {}
         for item in pt_qs:
@@ -205,6 +206,15 @@ def get_live_members(date_from, date_to, search_q=None):
             
             if item['transaction_type'] == 'seminar':
                 seminar_counts[cnum] = item['cnt']
+                
+        # Kurangi poin untuk klaim yang masih pending (Held points)
+        pending_qs = RedemptionClaim.objects.filter(status='pending').values('member__member_id').annotate(total=Sum('reward__points_cost'))
+        for item in pending_qs:
+            cnum = item['member__member_id']
+            if not cnum: continue
+            if cnum not in local_points:
+                local_points[cnum] = 0
+            local_points[cnum] -= item['total'] or 0
     except Exception:
         local_points = {}
         seminar_counts = {}

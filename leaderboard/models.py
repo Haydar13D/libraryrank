@@ -105,12 +105,16 @@ class PointPolicy(models.Model):
         return f"{self.action_type.capitalize()} = {self.points} XP"
 
 
+import os
+from io import BytesIO
+from django.core.files import File
+
 class Reward(models.Model):
     name = models.CharField(max_length=150)
     description = models.TextField()
     points_cost = models.IntegerField(default=100)
     stock = models.IntegerField(default=10)
-    image_url = models.CharField(max_length=200, blank=True)
+    image = models.ImageField(upload_to='rewards/', blank=True, null=True, help_text="Gambar akan otomatis dikompres menjadi PNG maksimal 500px.")
     is_active = models.BooleanField(default=True)
     
     class Meta:
@@ -118,6 +122,29 @@ class Reward(models.Model):
         
     def __str__(self):
         return f"{self.name} ({self.points_cost} XP)"
+
+    def save(self, *args, **kwargs):
+        if self.image and not getattr(self.image, '_committed', True):
+            try:
+                from PIL import Image
+                img = Image.open(self.image)
+                if img.mode in ("RGBA", "P"):
+                    img = img.convert("RGBA")
+                else:
+                    img = img.convert("RGB")
+                
+                img.thumbnail((500, 500), Image.Resampling.LANCZOS)
+                
+                output = BytesIO()
+                img.save(output, format='PNG', optimize=True)
+                output.seek(0)
+                
+                filename = os.path.splitext(self.image.name)[0] + '.png'
+                self.image = File(output, name=filename)
+            except Exception:
+                pass
+                
+        super().save(*args, **kwargs)
 
 
 # ==========================================
@@ -347,6 +374,7 @@ class RedemptionClaim(models.Model):
     STATUS_CHOICES = [
         ('pending', 'Pending / Belum Diambil'),
         ('claimed', 'Claimed / Sudah Diambil'),
+        ('rejected', 'Rejected / Ditolak'),
     ]
     code = models.CharField(max_length=50, unique=True, db_index=True)
     member = models.ForeignKey(Member, on_delete=models.CASCADE, related_name='redemptions')
@@ -408,6 +436,7 @@ class SeminarRegistration(models.Model):
 
 class SeminarUpload(models.Model):
     title = models.CharField(max_length=200, help_text="Nama atau Judul Seminar")
+    points = models.IntegerField(default=15, help_text="Jumlah poin yang akan diberikan ke setiap mahasiswa")
     csv_file = models.FileField(upload_to='seminars/', help_text="Upload file CSV berisi satu kolom NIM/Cardnumber", blank=True, null=True)
     manual_input = models.TextField(blank=True, help_text="Atau input NIM/Cardnumber mahasiswa di sini (satu NIM per baris)")
     processed = models.BooleanField(default=False)
@@ -427,9 +456,7 @@ class SeminarUpload(models.Model):
         
         if not self.processed and (self.csv_file or self.manual_input):
             try:
-                # Get points from policy
-                policy = PointPolicy.objects.filter(action_type='seminar', is_active=True).first()
-                points = policy.points if policy else 15
+                points = self.points
                 
                 cardnumbers = []
                 
@@ -523,3 +550,63 @@ class APIKey(models.Model):
 
     def __str__(self):
         return f"{self.name} ({str(self.key)[:8]}...)"
+
+
+# ==========================================
+# SYSTEM CONFIGURATION
+# ==========================================
+
+class LeaderboardConfig(models.Model):
+    RESET_MODE_CHOICES = [
+        ('manual', 'Manual (Reset Kapan Saja)'),
+        ('auto_semester', 'Otomatis Tiap Semester (Jan & Jul)'),
+        ('auto_yearly', 'Otomatis Tahunan'),
+    ]
+    MONTH_CHOICES = [
+        (1, 'Januari'), (2, 'Februari'), (3, 'Maret'), (4, 'April'),
+        (5, 'Mei'), (6, 'Juni'), (7, 'Juli'), (8, 'Agustus'),
+        (9, 'September'), (10, 'Oktober'), (11, 'November'), (12, 'Desember')
+    ]
+    
+    reset_mode = models.CharField(max_length=20, choices=RESET_MODE_CHOICES, default='auto_semester', help_text="Pilih sistem kapan poin & klasemen akan di-reset menjadi 0.")
+    yearly_reset_month = models.IntegerField(choices=MONTH_CHOICES, default=8, help_text="Jika memilih 'Otomatis Tahunan', pada tanggal 1 bulan apa reset dilakukan? (Default: Agustus)")
+    manual_reset_date = models.DateField(null=True, blank=True, help_text="Jika memilih 'Manual', masukkan tanggal mulainya musim ini. Semua poin sebelum tanggal ini akan diabaikan.")
+
+    class Meta:
+        verbose_name = 'Pengaturan Reset Poin'
+        verbose_name_plural = 'Pengaturan Reset Poin'
+
+    def __str__(self):
+        return "Pengaturan Klasemen"
+
+    @classmethod
+    def get_active_reset_date(cls):
+        """Returns the active point calculation start date based on config."""
+        from datetime import date
+        config = cls.objects.first()
+        today = date.today()
+        
+        if not config:
+            # Default fallback: auto semester
+            if today.month <= 6:
+                return today.replace(month=1, day=1)
+            return today.replace(month=7, day=1)
+            
+        if config.reset_mode == 'manual':
+            if config.manual_reset_date:
+                return config.manual_reset_date
+            return today.replace(year=2000, month=1, day=1) # No reset
+            
+        elif config.reset_mode == 'auto_semester':
+            if today.month <= 6:
+                return today.replace(month=1, day=1)
+            return today.replace(month=7, day=1)
+            
+        elif config.reset_mode == 'auto_yearly':
+            reset_month = config.yearly_reset_month
+            if today.month >= reset_month:
+                return today.replace(month=reset_month, day=1)
+            return today.replace(year=today.year - 1, month=reset_month, day=1)
+        
+        return today.replace(year=2000, month=1, day=1)
+

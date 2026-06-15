@@ -4,7 +4,7 @@ from django.views.decorators.cache import cache_page
 from datetime import date, timedelta
 import datetime
 import json
-from .models import Member, Reward, PointTransaction, RedemptionClaim, Seminar, SeminarRegistration
+from .models import Member, Reward, PointTransaction, RedemptionClaim, Seminar, SeminarRegistration, LeaderboardConfig
 # Ditch models entirely for leaderboard APIs
 from .demo_data import DEMO_DATA
 from .koha_utils import get_live_members, get_live_member_detail, get_live_faculties_stats, get_live_books_stats, get_live_daily_visits
@@ -13,16 +13,28 @@ from django.db import connections
 
 def get_date_range(request):
     today = date.today()
-    if today.month <= 6:
-        first = today.replace(month=1, day=1)
-    else:
-        first = today.replace(month=7, day=1)
+    # Gunakan konfigurasi tanggal reset aktif dari database
+    first = LeaderboardConfig.get_active_reset_date()
+    
     try:
         date_from = date.fromisoformat(request.GET.get('date_from', first.isoformat()))
         date_to   = date.fromisoformat(request.GET.get('date_to',   today.isoformat()))
     except ValueError:
         date_from, date_to = first, today
     return date_from, date_to
+
+def api_admin_badges(request):
+    if not request.user.is_staff:
+        return JsonResponse({'success': False, 'message': 'Unauthorized'}, status=403)
+        
+    pending_claims = RedemptionClaim.objects.filter(status='pending').count()
+    pending_registrations = SeminarRegistration.objects.filter(status='registered').count()
+    
+    return JsonResponse({
+        'success': True,
+        'pending_claims': pending_claims,
+        'pending_registrations': pending_registrations
+    })
 
 def _use_demo():
     # If the koha connection can't be reached, fallback to demo
@@ -357,8 +369,10 @@ def get_member_total_points(cardnumber):
         p = next((x for x in _ALL if x['id'] == cardnumber), None)
         if p:
             from django.db.models import Sum
+            from .models import PointTransaction, RedemptionClaim
             local_pt = PointTransaction.objects.filter(cardnumber=cardnumber).aggregate(total=Sum('amount'))['total'] or 0
-            return p['visits'] + local_pt
+            pending_pt = RedemptionClaim.objects.filter(member__member_id=cardnumber, status='pending').aggregate(total=Sum('reward__points_cost'))['total'] or 0
+            return p['visits'] + local_pt - pending_pt
         return 0
         
     from .koha_utils import get_live_members

@@ -86,8 +86,10 @@ def integration_rewards(request):
         data.append({
             'id': r.id,
             'name': r.name,
+            'description': r.description,
             'points_cost': r.points_cost,
             'stock': r.stock,
+            'image_url': request.build_absolute_uri(r.image.url) if r.image else None,
             'is_available': r.stock > 0
         })
     return JsonResponse({'success': True, 'data': data})
@@ -126,16 +128,12 @@ def integration_redeem(request):
     
     try:
         with transaction.atomic():
-            PointTransaction.objects.create(
-                cardnumber=member_id,
-                amount=-reward.points_cost,
-                transaction_type='redeem',
-                description=f"API Redeem: {reward.name}"
-            )
-            
+            # Kurangi stok terlebih dahulu
             reward.stock = models.F('stock') - 1
             reward.save()
             
+            # Buat RedemptionClaim (Pending)
+            # Poin BELUM DIPOTONG PERMANEN (belum masuk PointTransaction)
             RedemptionClaim.objects.create(
                 code=claim_code,
                 member=member,

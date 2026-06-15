@@ -206,7 +206,7 @@ from django.urls import reverse_lazy
 
 UNFOLD = {
     'SITE_TITLE': 'LibraryRank Admin',
-    'SITE_HEADER': 'LibraryRank Command Center',
+    'SITE_HEADER': 'LibraryRank Admin',
     'SITE_SYMBOL': 'speed', # Material icon
     'COLORS': {
         'primary': {
@@ -223,6 +223,10 @@ UNFOLD = {
             '950': '#052927',
         },
     },
+    "SCRIPTS": [
+        lambda request: static("js/admin_realtime_badges.js"),
+        lambda request: static("js/admin_modal.js"),
+    ],
     "SIDEBAR": {
         "show_search": True,
         "show_all_applications": False,
@@ -331,50 +335,7 @@ UNFOLD = {
             },
         ],
     },
-    "TABS": [
-        {
-            "models": [
-                "leaderboard.member",
-                "leaderboard.faculty",
-                "leaderboard.book",
-            ],
-            "items": [
-                {
-                    "title": "Members",
-                    "link": "/admin/leaderboard/member/",
-                },
-                {
-                    "title": "Faculties",
-                    "link": "/admin/leaderboard/faculty/",
-                },
-                {
-                    "title": "Books",
-                    "link": "/admin/leaderboard/book/",
-                },
-            ],
-        },
-        {
-            "models": [
-                "leaderboard.badgerule",
-                "leaderboard.leveltier",
-                "leaderboard.pointpolicy",
-            ],
-            "items": [
-                {
-                    "title": "Badges",
-                    "link": "/admin/leaderboard/badgerule/",
-                },
-                {
-                    "title": "Levels",
-                    "link": "/admin/leaderboard/leveltier/",
-                },
-                {
-                    "title": "Point Policies",
-                    "link": "/admin/leaderboard/pointpolicy/",
-                },
-            ],
-        },
-    ],
+
 }
 
 # -----------------------------------------------------------------------------

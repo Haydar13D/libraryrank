@@ -136,10 +136,17 @@ async function fetchOverview(params) {
 
 async function updateQuickSearch(q) {
   const quickCard = document.getElementById('searchResultQuick');
+  const searchIcon = document.querySelector('.search-icon');
+  
   if (!quickCard) return;
   if (!q || q.length < 3) {
     quickCard.style.display = 'none';
+    if (searchIcon) searchIcon.innerHTML = '<span class="material-icons-outlined">search</span>';
     return;
+  }
+  
+  if (searchIcon) {
+    searchIcon.innerHTML = '<span class="material-icons-outlined" style="animation: spinLoading 1s linear infinite;">autorenew</span>';
   }
   
   try {
@@ -171,7 +178,9 @@ async function updateQuickSearch(q) {
     } else {
       quickCard.style.display = 'none';
     }
-  } catch(e) {}
+  } catch(e) {} finally {
+    if (searchIcon) searchIcon.innerHTML = '<span class="material-icons-outlined">search</span>';
+  }
 }
 
 async function fetchRole(role, params) {

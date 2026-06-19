@@ -7,36 +7,36 @@
   <h1>UMSLibrary<br><span>Leaderboard</span></h1>
   <p>Merayakan pembaca, pengunjung &amp; teraktif serta prestasi akademik di seluruh fakultas.</p>
 
-  <div style="margin-top: 36px; max-width: 540px; margin-left: auto; margin-right: auto; text-align: left;">
+  <div style="margin-top: 40px; max-width: 580px; margin-left: auto; margin-right: auto; text-align: left; position: relative; z-index: 10;">
     <h3
-      style="font-size: 1.05rem; color: var(--text); margin-bottom: 12px; display: flex; align-items: center; justify-content: center; gap: 6px;">
+      style="font-size: 1.15rem; color: var(--text); font-weight: 800; margin-bottom: 16px; display: flex; align-items: center; justify-content: center; gap: 8px;">
       <span class="material-icons-outlined" style="color: var(--gold);">redeem</span>
-      Cari poinmu berapa & dapatkan hadiahnya!
+      Cari poinmu & dapatkan hadiahnya!
     </h3>
-    <div class="search-wrap" style="width: 100%;">
+    
+    <div class="search-wrap" style="width: 100%; position: relative;">
+      <input type="text" id="searchInput" placeholder="Cari NIM atau Nama Anda disini..." value="{{ search_q }}">
       <span class="search-icon"><span class="material-icons-outlined">search</span></span>
-      <input type="text" id="searchInput" placeholder="🔍 Cari NIM atau Nama Anda disini..." value="{{ search_q }}">
     </div>
 
     <!-- Quick Search Result -->
-    <div id="searchResultQuick"
-      style="display: none; margin-top: 14px; background: var(--surface); border: 2px solid var(--primary); box-shadow: 0 4px 12px rgba(129, 140, 248, 0.15); border-radius: 12px; padding: 12px 16px; align-items: center; justify-content: space-between; text-align: left; transition: transform 0.2s;">
-      <div style="display: flex; align-items: center; gap: 12px;">
+    <div id="searchResultQuick" class="premium-quick-card" style="display: none;">
+      <div style="display: flex; align-items: center; gap: 14px;">
         <div id="quickAvatar"
-          style="width:44px; height:44px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size: 1.1rem; flex-shrink: 0;">
+          style="width:52px; height:52px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:800; font-size: 1.25rem; flex-shrink: 0; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
         </div>
         <div style="overflow: hidden;">
           <div id="quickName"
-            style="font-weight: 700; color: var(--text); font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            style="font-weight: 800; color: var(--text); font-size: 1.05rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px;">
           </div>
           <div id="quickFaculty"
-            style="font-size: 0.8rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            style="font-size: 0.85rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
           </div>
         </div>
       </div>
       <div style="text-align: right; flex-shrink: 0;">
-        <div id="quickXP" style="font-weight: 800; font-size: 1.2rem; color: var(--primary);"></div>
-        <div style="font-size: 0.7rem; font-weight: 700; color: var(--muted); text-transform: uppercase;">Total XP</div>
+        <div id="quickXP" style="font-weight: 900; font-size: 1.4rem; color: var(--primary); letter-spacing: -0.5px; text-shadow: 0 2px 8px rgba(129, 140, 248, 0.3);"></div>
+        <div style="font-size: 0.75rem; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: 1px;">Total XP</div>
       </div>
     </div>
 
@@ -104,6 +104,10 @@
 </div>
 
 <style>
+  @keyframes spinLoading {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
   .merch-slide:hover {
     border-color: var(--surface3);
   }

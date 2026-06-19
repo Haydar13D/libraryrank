@@ -391,36 +391,73 @@ body { padding-top: 80px; }
 .search-wrap input {
   width: 100%;
   background: var(--surface);
+  backdrop-filter: blur(8px);
   border: 2px solid var(--border);
-  border-radius: 12px;
-  padding: 12px 16px 12px 42px;
+  border-radius: 50px;
+  padding: 16px 20px 16px 54px;
   color: var(--text);
   font-family: 'Inter', sans-serif;
-  font-size: .95rem;
-  font-weight: 500;
+  font-size: 1.05rem;
+  font-weight: 600;
   outline: none;
-  transition: all .2s ease;
+  transition: all .3s cubic-bezier(0.25, 0.8, 0.25, 1);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
 }
 
 .search-wrap input:hover {
-  border-color: var(--primary-light);
+  border-color: rgba(129, 140, 248, 0.6);
+  box-shadow: 0 8px 24px rgba(129, 140, 248, 0.12);
+  transform: translateY(-2px);
 }
 
 .search-wrap input:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 4px rgba(129, 140, 248, 0.2);
+  box-shadow: 0 0 0 4px rgba(129, 140, 248, 0.25), 0 12px 40px rgba(129, 140, 248, 0.15);
+  transform: translateY(-2px);
+  background: var(--surface);
 }
 
-.search-wrap input::placeholder { color: var(--muted); }
+.search-wrap input::placeholder { color: var(--muted); font-weight: 500; }
 
 .search-icon {
   position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
+  left: 18px;
+  top: 0;
+  height: 100%;
   color: var(--muted);
   pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.search-wrap input:focus ~ .search-icon {
+  color: var(--primary);
+}
+
+.search-wrap input:hover ~ .search-icon {
+  color: var(--primary);
+}
+
+.premium-quick-card {
+  margin-top: 20px;
+  background: var(--surface);
+  border: 2px solid var(--primary-light);
+  box-shadow: 0 16px 40px rgba(129, 140, 248, 0.2);
+  border-radius: 16px;
+  padding: 14px 20px;
+  align-items: center;
+  justify-content: space-between;
+  text-align: left;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  backdrop-filter: blur(12px);
+}
+
+.premium-quick-card:hover {
+  border-color: var(--primary);
+  box-shadow: 0 20px 50px rgba(129, 140, 248, 0.3);
+  transform: translateY(-4px) scale(1.02);
 }
 
 .date-input {

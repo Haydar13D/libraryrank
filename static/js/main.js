@@ -113,12 +113,12 @@ function loadTab(tab) {
   });
 
   switch (tab) {
-    case 'overview':   fetchOverview(params); break;
-    case 'students':   fetchRole('student', params); break;
-    case 'lecturers':  fetchRole('lecturer', params); break;
-    case 'staff':      fetchRole('staff', params); break;
-    case 'books':      fetchBooks(params); break;
-    case 'faculties':  fetchFaculties(params); break;
+    case 'overview': fetchOverview(params); break;
+    case 'students': fetchRole('student', params); break;
+    case 'lecturers': fetchRole('lecturer', params); break;
+    case 'staff': fetchRole('staff', params); break;
+    case 'books': fetchBooks(params); break;
+    case 'faculties': fetchFaculties(params); break;
   }
 }
 
@@ -129,7 +129,11 @@ async function fetchOverview(params) {
     const data = await res.json();
     renderStats(data.stats);
     renderNominations(data.nominations);
-    renderList('overviewList', data.leaderboard, null, true, 'visits', 'XP');
+
+    // Split leaderboard into top 3 (podium) and the rest (list)
+    renderPodium('podium-overview', data.leaderboard.slice(0, 3), 'student');
+    renderList('overviewList', data.leaderboard.slice(3), null, true, 'visits', 'XP', 3);
+
     if (typeof Chart !== 'undefined') renderChart(data);
   } catch (e) { console.error(e); }
 }
@@ -137,48 +141,48 @@ async function fetchOverview(params) {
 async function updateQuickSearch(q) {
   const quickCard = document.getElementById('searchResultQuick');
   const searchIcon = document.querySelector('.search-icon');
-  
+
   if (!quickCard) return;
   if (!q || q.length < 3) {
     quickCard.style.display = 'none';
     if (searchIcon) searchIcon.innerHTML = '<span class="material-icons-outlined">search</span>';
     return;
   }
-  
+
   if (searchIcon) {
     searchIcon.innerHTML = '<span class="material-icons-outlined" style="animation: spinLoading 1s linear infinite;">autorenew</span>';
   }
-  
+
   try {
     const params = new URLSearchParams({ q: q });
     const res = await fetch(`/api/overview/?${params}`);
     const data = await res.json();
     if (data.leaderboard && data.leaderboard.length > 0) {
       const p = data.leaderboard[0];
-      
+
       // If we find an exact match on NIM or Name, or just show the top result if it's very relevant
       // We will just show the top result if it exists.
       document.getElementById('quickName').textContent = p.name;
       document.getElementById('quickFaculty').textContent = p.id + ' • ' + (p.faculty || '');
       document.getElementById('quickXP').textContent = p.visits + ' XP';
       document.getElementById('quickAvatar').textContent = p.initials;
-      
+
       const role = p.role || 'student';
       const { bg, text } = ROLE_COLORS[role] || ROLE_COLORS.student;
       document.getElementById('quickAvatar').style.background = bg;
       document.getElementById('quickAvatar').style.color = text;
-      
+
       quickCard.style.display = 'flex';
       quickCard.onclick = () => fetchMemberDetail(p.id, role);
       quickCard.style.cursor = 'pointer';
-      
+
       // Hover effect
       quickCard.onmouseenter = () => quickCard.style.transform = 'translateY(-2px)';
       quickCard.onmouseleave = () => quickCard.style.transform = 'translateY(0)';
     } else {
       quickCard.style.display = 'none';
     }
-  } catch(e) {} finally {
+  } catch (e) { } finally {
     if (searchIcon) searchIcon.innerHTML = '<span class="material-icons-outlined">search</span>';
   }
 }
@@ -187,7 +191,17 @@ async function fetchRole(role, params) {
   try {
     const res = await fetch(`/api/pemustaka-teraktif/?role=${role}&${params}`);
     const data = await res.json();
-    renderList(`list-${role}-xp`, data.top_xp, role, false, 'total_p', 'XP');
+
+    const topXp = data.top_xp || [];
+    if (topXp.length >= 3) {
+      renderPodium(`podium-${role}-xp`, topXp.slice(0, 3), role);
+      renderList(`list-${role}-xp`, topXp.slice(3), role, false, 'total_p', 'XP', 3);
+    } else {
+      const podiumEl = document.getElementById(`podium-${role}-xp`);
+      if (podiumEl) podiumEl.innerHTML = '';
+      renderList(`list-${role}-xp`, topXp, role, false, 'total_p', 'XP', 0);
+    }
+
     renderList(`list-${role}-visitors`, data.top_pengunjung, role, false, 'visits', 'Kedatangan');
     renderList(`list-${role}-borrowers`, data.top_peminjam, role, false, 'books', 'Buku');
     renderList(`list-${role}-seminar`, data.top_seminar, role, false, 'visits', 'Seminar');
@@ -229,48 +243,88 @@ let overviewChartInstance = null;
 function renderChart(data) {
   const ctx = document.getElementById('overviewChart');
   if (!ctx) return;
-  
+
   let dataPoints = data.daily_visits;
   if (!dataPoints || dataPoints.length !== 7) {
     // Fallback if not provided or wrong format (Monday to Saturday randomized, Sunday is 0)
     const stats = data.stats || {};
     const total = stats.total_visitors || 500;
-    dataPoints = Array.from({length: 6}, () => Math.floor((Math.random() * 0.3 + 0.1) * (total / 6)));
+    dataPoints = Array.from({ length: 6 }, () => Math.floor((Math.random() * 0.3 + 0.1) * (total / 6)));
     dataPoints.push(0); // Sunday is always 0
   }
-  
+
   const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
   const textColor = isDark ? '#94A3B8' : '#64748B';
   const gridColor = isDark ? '#334155' : '#E2E8F0';
 
+  const ctxObj = ctx.getContext('2d');
+  const gradientFill = ctxObj.createLinearGradient(0, 0, 0, 300);
+  gradientFill.addColorStop(0, 'rgba(96, 165, 250, 0.4)');
+  gradientFill.addColorStop(1, 'rgba(96, 165, 250, 0.0)');
+
+  const gradientStroke = ctxObj.createLinearGradient(0, 0, 600, 0);
+  gradientStroke.addColorStop(0, '#60a5fa');
+  gradientStroke.addColorStop(1, '#a78bfa');
+
   if (overviewChartInstance) overviewChartInstance.destroy();
-  
+
   overviewChartInstance = new Chart(ctx, {
     type: 'line',
     data: {
       labels: ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'],
       datasets: [{
-        label: 'Kunjungan Harian',
+        label: 'Kunjungan',
         data: dataPoints,
-        borderColor: 'var(--primary, #818CF8)',
-        backgroundColor: 'rgba(129, 140, 248, 0.15)',
+        borderColor: gradientStroke,
+        backgroundColor: gradientFill,
         fill: true,
-        tension: 0.4,
-        borderWidth: 3,
-        pointBackgroundColor: 'var(--primary, #818CF8)',
-        pointBorderColor: 'var(--surface, #fff)',
-        pointBorderWidth: 2,
-        pointRadius: 4,
-        pointHoverRadius: 6
+        tension: 0.45,
+        borderWidth: 4,
+        pointBackgroundColor: '#1e293b',
+        pointBorderColor: '#a78bfa',
+        pointBorderWidth: 3,
+        pointRadius: 5,
+        pointHoverRadius: 8,
+        pointHoverBackgroundColor: '#a78bfa',
+        pointHoverBorderColor: '#fff',
       }]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: 'rgba(15, 23, 42, 0.9)',
+          titleColor: '#fff',
+          bodyColor: '#cbd5e1',
+          titleFont: { family: "'Plus Jakarta Sans', sans-serif", size: 14, weight: 'bold' },
+          bodyFont: { family: "'Plus Jakarta Sans', sans-serif", size: 13 },
+          borderColor: 'rgba(255,255,255,0.1)',
+          borderWidth: 1,
+          padding: 12,
+          displayColors: false,
+          callbacks: {
+            label: function (context) {
+              return context.parsed.y.toLocaleString() + ' kunjungan';
+            }
+          }
+        }
+      },
       scales: {
-        y: { beginAtZero: true, grid: { color: gridColor }, ticks: { color: textColor } },
-        x: { grid: { display: false }, ticks: { color: textColor } }
+        y: {
+          beginAtZero: true,
+          grid: { color: gridColor, borderDash: [6, 6], drawBorder: false },
+          ticks: { color: textColor, padding: 12, font: { family: "'Plus Jakarta Sans', sans-serif", size: 12 } }
+        },
+        x: {
+          grid: { display: false, drawBorder: false },
+          ticks: { color: textColor, padding: 12, font: { family: "'Plus Jakarta Sans', sans-serif", size: 12 } }
+        }
+      },
+      interaction: {
+        mode: 'index',
+        intersect: false,
       }
     }
   });
@@ -288,9 +342,9 @@ function renderNominations(noms) {
   if (!container) return;
 
   const roleConfig = {
-    student:  { label: '<span class="material-icons-outlined" style="vertical-align: middle; margin-right: 4px; font-size: 1.15rem; color: var(--gold);">school</span> Top Student',  cls: 'students' },
+    student: { label: '<span class="material-icons-outlined" style="vertical-align: middle; margin-right: 4px; font-size: 1.15rem; color: var(--gold);">school</span> Top Student', cls: 'students' },
     lecturer: { label: '<span class="material-icons-outlined" style="vertical-align: middle; margin-right: 4px; font-size: 1.15rem; color: var(--gold);">person</span> Top Lecturer', cls: 'lecturers' },
-    staff:    { label: '<span class="material-icons-outlined" style="vertical-align: middle; margin-right: 4px; font-size: 1.15rem; color: var(--gold);">work</span> Top Staff',     cls: 'staff' },
+    staff: { label: '<span class="material-icons-outlined" style="vertical-align: middle; margin-right: 4px; font-size: 1.15rem; color: var(--gold);">work</span> Top Staff', cls: 'staff' },
   };
 
   container.innerHTML = Object.entries(roleConfig).map(([role, cfg]) => {
@@ -312,7 +366,7 @@ function renderNominations(noms) {
   }).join('');
 }
 
-function renderList(containerId, items, forceRole, showRoleTag = false, scoreKey = 'visits', scoreLabel = 'visits') {
+function renderList(containerId, items, forceRole, showRoleTag = false, scoreKey = 'visits', scoreLabel = 'visits', rankOffset = 0) {
   const el = document.getElementById(containerId);
   if (!el) return;
 
@@ -324,21 +378,22 @@ function renderList(containerId, items, forceRole, showRoleTag = false, scoreKey
   el.innerHTML = items.map((p, i) => {
     const role = forceRole || p.role;
     const { bg, text } = ROLE_COLORS[role] || ROLE_COLORS.student;
-    const rankEl = i === 0 ? '<span class="material-icons-outlined">workspace_premium</span>' : i === 1 ? '<span class="material-icons-outlined">workspace_premium</span>' : i === 2 ? '<span class="material-icons-outlined">workspace_premium</span>' : (i + 1);
-    const rankCls = i === 0 ? 'top1' : i === 1 ? 'top2' : i === 2 ? 'top3' : '';
-    const roleTag = showRoleTag ? `<span style="font-size:.68rem;padding:2px 6px;border-radius:20px;background:${bg};color:${text};font-weight:700;margin-left:6px">${role}</span>` : '';
+    const actualRank = i + rankOffset;
+    const rankEl = actualRank === 0 ? '<span class="material-icons-outlined">workspace_premium</span>' : actualRank === 1 ? '<span class="material-icons-outlined">workspace_premium</span>' : actualRank === 2 ? '<span class="material-icons-outlined">workspace_premium</span>' : (actualRank + 1);
+    const rankCls = actualRank === 0 ? 'top1' : actualRank === 1 ? 'top2' : actualRank === 2 ? 'top3' : '';
+
     return `
       <div class="lb-item ${rankCls}" data-id="${p.id}" data-role="${role}">
-        <div class="lb-rank ${rankCls}">${rankEl}</div>
-        <div class="lb-avatar" style="background:${bg};color:${text}">${p.initials}</div>
-        <div class="lb-info">
-          <div class="lb-name">${p.name}${roleTag}</div>
-          <div class="lb-sub">${p.sub || p.faculty || ''}</div>
+        <div class="lb-col lb-col-rank ${rankCls}">${rankEl}</div>
+        <div class="lb-col lb-col-user">
+          <div class="lb-avatar" style="background:${bg};color:${text}">${p.initials}</div>
+          <div class="lb-info">
+            <div class="lb-name">${p.name}</div>
+            <div class="lb-sub">@${(p.id || p.sub || '').toString().toLowerCase()}</div>
+          </div>
         </div>
-        <div class="lb-score-wrap">
-          <div class="lb-score" style="color:${text}">${p[scoreKey]}</div>
-          <div class="lb-score-label">${scoreLabel.toUpperCase()}</div>
-        </div>
+        <div class="lb-col lb-col-dept">${p.sub || p.faculty || '-'}</div>
+        <div class="lb-col lb-col-score">${Number(p[scoreKey]).toLocaleString()}${scoreLabel === 'XP' ? ' <span style="font-size:0.75em; font-weight:700; color:var(--muted); margin-left:2px;">XP</span>' : ''}</div>
       </div>`;
   }).join('');
 
@@ -366,21 +421,35 @@ function renderPodium(containerId, items, role) {
   const order = [1, 0, 2];
   const cls = ['second', 'first', 'third'];
   const heights = [80, 110, 56];
-  const { bg, text } = ROLE_COLORS[role] || ROLE_COLORS.student;
-
   el.innerHTML = order.map((idx, pos) => {
     const p = items[idx];
     if (!p) return '';
+    const itemRole = p.role || role;
+    const { bg, text } = ROLE_COLORS[itemRole] || ROLE_COLORS.student;
     return `
-      <div class="podium-item ${cls[pos]}" data-id="${p.id}" data-role="${role}">
-        <div class="podium-avatar" style="background:${bg};color:${text}">
-          ${cls[pos] === 'first' ? '<div class="podium-crown"><span class="material-icons-outlined" style="font-size: 1.4rem; color: var(--gold);">emoji_events</span></div>' : ''}
-          ${p.initials}
-        </div>
-        <div class="podium-name">${p.name}</div>
-        <div class="podium-score">${p.visits} visits</div>
-        <div class="podium-base" style="height:${heights[pos]}px">${idx + 1}</div>
-      </div>`;
+        <div class="podium-item ${cls[pos]}" data-id="${p.id}" data-role="${itemRole}">
+          <div class="podium-avatar" style="background:${bg};color:${text}">
+            ${cls[pos] === 'first' ? '<div class="podium-crown"><span class="material-icons-outlined" style="font-size: 1.4rem; color: var(--gold);">emoji_events</span></div>' : ''}
+            ${p.initials}
+          </div>
+          <div class="podium-name">${p.name}</div>
+          <div class="podium-score">${p.total_p} XP</div>
+          <div class="podium-base">
+            <div class="podium-inner-content">
+              <div class="podium-earn">
+                <div class="trophy-icon"><span class="material-icons-outlined" style="font-size:1.1rem;">emoji_events</span></div>
+                
+              </div>
+              <div style="text-align: center;">
+                <div class="podium-prize">
+                  <span class="material-icons-outlined" style="color: #60a5fa;">diamond</span>
+                  ${Number(p.total_p).toLocaleString()}
+                </div>
+                <div class="podium-prize-label">XP</div>
+              </div>
+            </div>
+          </div>
+        </div>`;
   }).join('');
 
   el.querySelectorAll('.podium-item').forEach(item => {
@@ -426,7 +495,7 @@ function renderFaculties(faculties) {
     <div class="fac-row">
       <div class="fac-dot" style="background:${f.color}"></div>
       <div class="fac-name-label">${f.name}</div>
-      <div class="fac-bar-track"><div class="fac-bar-fill" style="background:${f.color}" data-pct="${Math.round(f.visitors/max*100)}%"></div></div>
+      <div class="fac-bar-track"><div class="fac-bar-fill" style="background:${f.color}" data-pct="${Math.round(f.visitors / max * 100)}%"></div></div>
       <div class="fac-count" style="color:${f.color}">${f.visitors}</div>
     </div>`).join('');
   setTimeout(() => {
@@ -448,7 +517,7 @@ function renderFacultyBooks(faculties) {
         <div class="book-author">${f.visitors} visitors</div>
       </div>
       <div class="book-bar-wrap">
-        <div class="book-bar-track"><div class="book-bar-fill" style="background:${f.color};width:0%" data-pct="${Math.round(f.books/max*100)}%"></div></div>
+        <div class="book-bar-track"><div class="book-bar-fill" style="background:${f.color};width:0%" data-pct="${Math.round(f.books / max * 100)}%"></div></div>
         <div class="book-count">${f.books}×</div>
       </div>
     </div>`).join('');
@@ -512,7 +581,7 @@ function renderModal(data, role) {
         <div style="display:flex; flex-direction:column; gap:10px;">
           ${badges.map(b => `
             <div style="display:flex; align-items:center; gap:12px; padding:12px; border-radius:10px; border:1px solid var(--border); background:rgba(47,49,133,0.04)">
-              <div style="font-size:1.8rem; width:48px; height:48px; display:flex; align-items:center; justify-content:center; background:${b.image_url ? 'none' : b.color+'20'}; border-radius:50%;flex-shrink:0;">
+              <div style="font-size:1.8rem; width:48px; height:48px; display:flex; align-items:center; justify-content:center; background:${b.image_url ? 'none' : b.color + '20'}; border-radius:50%;flex-shrink:0;">
                 ${b.image_url ? `<img src="${b.image_url}" alt="${b.name}" style="width:100%; height:100%; object-fit:contain;">` : getBadgeIconHtml(b.icon)}
               </div>
               <div style="flex:1;">
@@ -544,10 +613,10 @@ async function downloadIGStory() {
   const card = document.getElementById('captureCard');
   if (!card) return;
   try {
-    const canvas = await html2canvas(card, { 
+    const canvas = await html2canvas(card, {
       backgroundColor: '#282A6A', // matching theme background roughly
-      scale: 2, 
-      logging: false 
+      scale: 2,
+      logging: false
     });
     const link = document.createElement('a');
     link.download = 'LibraryRank_Achievement.jpg';
@@ -784,7 +853,7 @@ function openRedeemModal(rewardId, rewardName, rewardCost, rewardStock) {
     const memberId = document.getElementById('redeemMemberId').value.trim();
     const btn = document.getElementById('btnRequestOtp');
     const errDiv = document.getElementById('redeemError');
-    
+
     // UI Loading state
     btn.disabled = true;
     btn.innerHTML = `<span class="material-icons-outlined" style="animation: spin 1s linear infinite; display: inline-block;">sync</span> Mengirim OTP...`;
@@ -801,7 +870,7 @@ function openRedeemModal(rewardId, rewardName, rewardCost, rewardStock) {
       });
 
       const result = await response.json();
-      
+
       if (!response.ok || !result.success) {
         throw new Error(result.error || 'Terjadi kesalahan saat meminta OTP.');
       }
@@ -897,7 +966,7 @@ function openRedeemModal(rewardId, rewardName, rewardCost, rewardStock) {
   function renderRedeemSuccessStep(claimCode, name, cost, remainingPoints) {
     const stepContainer = document.getElementById('redeemStepContainer');
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${claimCode}`;
-    
+
     // Trigger toast success
     showToast('<span class="material-icons-outlined" style="color:var(--green)">celebration</span>', 'Penukaran poin berhasil!');
 

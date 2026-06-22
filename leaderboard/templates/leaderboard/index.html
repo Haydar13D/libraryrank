@@ -3,44 +3,80 @@
 
 {% block content %}
 
-<div class="hero">
-  <h1>UMSLibrary<br><span>Leaderboard</span></h1>
-  <p>Merayakan pembaca, pengunjung &amp; teraktif serta prestasi akademik di seluruh fakultas.</p>
-
-  <div style="margin-top: 40px; max-width: 580px; margin-left: auto; margin-right: auto; text-align: left; position: relative; z-index: 10;">
-    <h3
-      style="font-size: 1.15rem; color: var(--text); font-weight: 800; margin-bottom: 16px; display: flex; align-items: center; justify-content: center; gap: 8px;">
-      <span class="material-icons-outlined" style="color: var(--gold);">redeem</span>
-      Cari poinmu & dapatkan hadiahnya!
-    </h3>
-    
-    <div class="search-wrap" style="width: 100%; position: relative;">
-      <input type="text" id="searchInput" placeholder="Cari NIM atau Nama Anda disini..." value="{{ search_q }}">
-      <span class="search-icon"><span class="material-icons-outlined">search</span></span>
-    </div>
-
-    <!-- Quick Search Result -->
-    <div id="searchResultQuick" class="premium-quick-card" style="display: none;">
-      <div style="display: flex; align-items: center; gap: 14px;">
-        <div id="quickAvatar"
-          style="width:52px; height:52px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:800; font-size: 1.25rem; flex-shrink: 0; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-        </div>
-        <div style="overflow: hidden;">
-          <div id="quickName"
-            style="font-weight: 800; color: var(--text); font-size: 1.05rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px;">
-          </div>
-          <div id="quickFaculty"
-            style="font-size: 0.85rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-          </div>
-        </div>
-      </div>
-      <div style="text-align: right; flex-shrink: 0;">
-        <div id="quickXP" style="font-weight: 900; font-size: 1.4rem; color: var(--primary); letter-spacing: -0.5px; text-shadow: 0 2px 8px rgba(129, 140, 248, 0.3);"></div>
-        <div style="font-size: 0.75rem; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: 1px;">Total XP</div>
-      </div>
-    </div>
-
+<div class="hero" style="padding-top: 100px; border-bottom: none;">
+  <!-- Soft Radial Background Glow -->
+  <div
+    style="position: absolute; top: -20%; left: 50%; transform: translateX(-50%); width: 800px; height: 800px; background: radial-gradient(circle, rgba(167, 139, 250, 0.15) 0%, transparent 60%); z-index: 0; pointer-events: none;">
   </div>
+
+  <div
+    style="position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; text-align: center; max-width: 680px; margin: 0 auto; gap: 24px;">
+
+    <!-- Hero Icon/Logo -->
+    <div
+      style="animation: float-blob 6s ease-in-out infinite; background: rgba(255,215,0,0.08); width: 88px; height: 88px; border-radius: 28px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 40px rgba(255,215,0,0.1), inset 0 2px 10px rgba(255,215,0,0.2); border: 1px solid rgba(255,215,0,0.2);">
+      <span class="material-icons-outlined"
+        style="font-size: 4rem; color: #fbbf24; filter: drop-shadow(0 4px 12px rgba(255, 215, 0, 0.5));">emoji_events</span>
+    </div>
+
+    <!-- Title & Subtitle -->
+    <div>
+      <h1
+        style="font-size: clamp(2.8rem, 6vw, 4.2rem); font-weight: 800; line-height: 1.1; margin: 0; letter-spacing: -0.03em; color: var(--text);">
+        UMSLibrary<br>
+        <span
+          style="background: linear-gradient(135deg, #a78bfa, #60a5fa); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Leaderboard</span>
+      </h1>
+      <p style="font-size: 1.15rem; color: var(--muted); margin: 20px auto 0; max-width: 540px; line-height: 1.6;">
+        Semangat literasi dan keaktifan sivitas akademika di UPT Perpustakaan dan Layanan Digital.
+      </p>
+    </div>
+
+    <!-- Search Section -->
+    <div style="width: 100%; margin-top: 24px; display: flex; flex-direction: column; align-items: center; gap: 16px;">
+      <h3
+        style="font-size: 1.1rem; color: var(--text); font-weight: 700; margin: 0; display: flex; align-items: center; gap: 8px;">
+        <span class="material-icons-outlined" style="color: #fbbf24; font-size: 1.3rem;">redeem</span>
+        Cari poinmu & dapatkan hadiahnya!
+      </h3>
+
+      <div class="search-wrap" style="width: 100%; max-width: 580px; position: relative;">
+        <input type="text" id="searchInput" placeholder="Cari NIM atau Nama Anda disini..." value="{{ search_q }}"
+          style="border-radius: 999px; box-shadow: 0 8px 32px rgba(0,0,0,0.08); border: 1px solid var(--border); padding-left: 28px; padding-right: 64px; height: 60px; font-size: 1.1rem; background: var(--surface); color: var(--text);">
+        <span class="search-icon"
+          style="left: auto; right: 20px; width: auto; height: auto; top: 50%; transform: translateY(-50%); background: none; border: none; padding: 0;"><span
+            class="material-icons-outlined" style="font-size: 1.8rem; color: var(--muted);">search</span></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick Search Result -->
+  <div id="searchResultQuick" class="premium-quick-card"
+    style="display: none; max-width: 580px; margin: 20px auto 0; width: 100%;">
+    <div style="display: flex; align-items: center; gap: 14px; flex: 1; min-width: 0;">
+      <div id="quickAvatar"
+        style="width:52px; height:52px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:800; font-size: 1.25rem; flex-shrink: 0; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+      </div>
+      <div style="overflow: hidden;">
+        <div id="quickName"
+          style="font-weight: 800; color: var(--text); font-size: 1.05rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px;">
+        </div>
+        <div id="quickFaculty"
+          style="font-size: 0.85rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+        </div>
+      </div>
+    </div>
+    <div style="text-align: right; flex-shrink: 0;">
+      <div id="quickXP"
+        style="font-weight: 900; font-size: 1.4rem; color: var(--primary); letter-spacing: -0.5px; text-shadow: 0 2px 8px rgba(129, 140, 248, 0.3);">
+      </div>
+      <div
+        style="font-size: 0.75rem; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: 1px;">
+        Total XP</div>
+    </div>
+  </div>
+
+</div>
 </div>
 
 <div class="stats-bar" id="statsBar">
@@ -57,9 +93,17 @@
 <!-- MERCHANDISE CAROUSEL -->
 <div class="merch-carousel-wrapper"
   style="overflow: hidden; width: 100%; max-width: 1200px; margin: 16px auto; background: var(--surface); border-radius: var(--radius); padding: 16px 0 12px; border: 1px solid var(--border); position: relative;">
-  <div style="display:flex; align-items:center; justify-content:space-between; padding: 0 20px 8px;">
-    <div class="section-title" style="margin: 0; font-size: 1rem;"><span class="material-icons-outlined">redeem</span>
-      Merchandise Reward</div>
+  <div
+    style="display:flex; align-items:center; justify-content:space-between; padding: 0 20px 8px; flex-wrap: wrap; gap: 8px;">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <div class="section-title" style="margin: 0; font-size: 1rem;"><span class="material-icons-outlined">redeem</span>
+        Merchandise Reward</div>
+      <button onclick="document.getElementById('modal-klaim').style.display='flex'"
+        style="background:var(--primary); color:white; border:none; border-radius:12px; padding:4px 12px; font-size:0.75rem; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:4px; transition:opacity 0.2s;"
+        onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1">
+        <span class="material-icons-outlined" style="font-size:1rem;">help_outline</span> Cara Klaim
+      </button>
+    </div>
     <span
       style="font-size:0.72rem; color:var(--muted); font-style:italic; display:flex; align-items:center; gap:4px;"><span
         class="material-icons-outlined" style="font-size:0.85rem;">info</span> Gambar bisa berbeda dengan produk
@@ -105,9 +149,15 @@
 
 <style>
   @keyframes spinLoading {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+    0% {
+      transform: rotate(0deg);
+    }
+
+    100% {
+      transform: rotate(360deg);
+    }
   }
+
   .merch-slide:hover {
     border-color: var(--surface3);
   }
@@ -176,20 +226,42 @@
       </div>
     </div>
 
-    <div class="section-title"><span class="material-icons-outlined">emoji_events</span> Top Poin (XP) Bulan Ini</div>
-    <div class="leaderboard-list" id="overviewList">
-      {% for i in "0123456" %}<div class="lb-skeleton"></div>{% endfor %}
+    <div class="card-block">
+      <h3 style="justify-content: center; font-size: 1.1rem; margin-bottom: 24px;"><span
+          class="material-icons-outlined">emoji_events</span> Top Poin (XP) Keseluruhan</h3>
+      <div id="podium-overview" class="podium-wrap"></div>
+
+
+      <div class="leaderboard-list-header">
+        <div>Rank</div>
+        <div>User name</div>
+        <div>NIM / UNIID</div>
+        <div>Point</div>
+      </div>
+      <div class="leaderboard-list" id="overviewList">
+        {% for i in "0123456" %}<div class="lb-skeleton"></div>{% endfor %}
+      </div>
     </div>
   </div>
 
   <!-- STUDENTS -->
   <div id="panel-students" class="panel">
-    <div class="section-title"><span class="material-icons-outlined">school</span> Student Rankings</div>
-    <div class="two-col">
-      <div class="card-block">
-        <h3><span class="material-icons-outlined">rocket_launch</span> Top XP Leaderboard</h3>
-        <div class="leaderboard-list" id="list-student-xp"></div>
+    <div class="card-block" style="margin-bottom: 24px;">
+      <h3 style="justify-content: center; font-size: 1.1rem; margin-bottom: 24px;"><span
+          class="material-icons-outlined">rocket_launch</span> Student Top XP Leaderboard</h3>
+      <div id="podium-student-xp" class="podium-wrap"></div>
+
+
+      <div class="leaderboard-list-header">
+        <div>Rank</div>
+        <div>User name</div>
+        <div>NIM/ UNIID</div>
+        <div>Point</div>
       </div>
+      <div class="leaderboard-list" id="list-student-xp"></div>
+    </div>
+    <div class="section-title"><span class="material-icons-outlined">dashboard</span> Other Metrics</div>
+    <div class="two-col">
       <div class="card-block">
         <h3><span class="material-icons-outlined">directions_walk</span> Top Pengunjung</h3>
         <div class="leaderboard-list" id="list-student-visitors"></div>
@@ -207,12 +279,24 @@
 
   <!-- LECTURERS -->
   <div id="panel-lecturers" class="panel">
-    <div class="section-title"><span class="material-icons-outlined">person</span> Lecturer Rankings</div>
-    <div class="two-col">
-      <div class="card-block">
-        <h3><span class="material-icons-outlined">rocket_launch</span> Top XP Leaderboard</h3>
-        <div class="leaderboard-list" id="list-lecturer-xp"></div>
+    <div class="card-block" style="margin-bottom: 24px;">
+      <h3 style="justify-content: center; font-size: 1.1rem; margin-bottom: 24px;"><span
+          class="material-icons-outlined">rocket_launch</span> Lecturer Top XP Leaderboard</h3>
+      <div id="podium-lecturer-xp" class="podium-wrap"></div>
+
+
+
+      <div class="leaderboard-list-header">
+        <div>Rank</div>
+        <div>User name</div>
+        <div>Faculty</div>
+        <div>Point</div>
+        <div>Reward</div>
       </div>
+      <div class="leaderboard-list" id="list-lecturer-xp"></div>
+    </div>
+    <div class="section-title"><span class="material-icons-outlined">dashboard</span> Other Metrics</div>
+    <div class="two-col">
       <div class="card-block">
         <h3><span class="material-icons-outlined">directions_walk</span> Top Pengunjung</h3>
         <div class="leaderboard-list" id="list-lecturer-visitors"></div>
@@ -230,12 +314,23 @@
 
   <!-- STAFF -->
   <div id="panel-staff" class="panel">
-    <div class="section-title"><span class="material-icons-outlined">work</span> Staff Rankings</div>
-    <div class="two-col">
-      <div class="card-block">
-        <h3><span class="material-icons-outlined">rocket_launch</span> Top XP Leaderboard</h3>
-        <div class="leaderboard-list" id="list-staff-xp"></div>
+    <div class="card-block" style="margin-bottom: 24px;">
+      <h3 style="justify-content: center; font-size: 1.1rem; margin-bottom: 24px;"><span
+          class="material-icons-outlined">rocket_launch</span> Staff Top XP Leaderboard</h3>
+      <div id="podium-staff-xp" class="podium-wrap"></div>
+
+
+      <div class="leaderboard-list-header">
+        <div>Rank</div>
+        <div>User name</div>
+        <div>Department</div>
+        <div>Point</div>
+        <div>Reward</div>
       </div>
+      <div class="leaderboard-list" id="list-staff-xp"></div>
+    </div>
+    <div class="section-title"><span class="material-icons-outlined">dashboard</span> Other Metrics</div>
+    <div class="two-col">
       <div class="card-block">
         <h3><span class="material-icons-outlined">directions_walk</span> Top Pengunjung</h3>
         <div class="leaderboard-list" id="list-staff-visitors"></div>
@@ -291,5 +386,66 @@
   </div>
 
 </div><!-- /main -->
+
+<!-- Modal Panduan Klaim -->
+<div id="modal-klaim"
+  style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); backdrop-filter:blur(4px); z-index:9999; align-items:center; justify-content:center; padding:16px;">
+  <div
+    style="background:var(--surface); border:1px solid var(--border); border-radius:24px; padding:32px 24px; max-width:440px; width:100%; box-shadow:0 24px 48px rgba(0,0,0,0.3); position:relative; animation: fade-in 0.3s ease;">
+    <button onclick="document.getElementById('modal-klaim').style.display='none'"
+      style="position:absolute; top:16px; right:16px; background:var(--surface2); border:none; width:32px; height:32px; border-radius:50%; cursor:pointer; color:var(--text); display:flex; align-items:center; justify-content:center; transition:background 0.2s;"><span
+        class="material-icons-outlined" style="font-size:1.2rem;">close</span></button>
+    <div style="text-align:center; margin-bottom:24px;">
+      <div
+        style="width:64px; height:64px; background:rgba(167, 139, 250, 0.15); border-radius:16px; display:flex; align-items:center; justify-content:center; margin:0 auto 16px;">
+        <span class="material-icons-outlined" style="font-size:2rem; color:var(--purple);">card_giftcard</span>
+      </div>
+      <h3 style="margin:0; font-size:1.4rem; color:var(--text); font-weight:800;">Panduan Klaim Merchandise</h3>
+      <p style="margin:8px 0 0; color:var(--muted); font-size:0.9rem;">Ikuti langkah mudah berikut untuk menukarkan poin
+        Anda!</p>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:16px; margin-bottom:24px;">
+      <div style="display:flex; gap:12px; align-items:flex-start;">
+        <div
+          style="width:28px; height:28px; border-radius:50%; background:var(--primary); color:white; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:0.85rem; flex-shrink:0;">
+          1</div>
+        <div>
+          <h4 style="margin:0 0 4px; font-size:0.95rem; color:var(--text);">Kumpulkan Poin XP</h4>
+          <p style="margin:0; font-size:0.85rem; color:var(--muted); line-height:1.5;">Tingkatkan kunjungan, pinjam
+            buku, dan aktif di UMS Library untuk mendapatkan poin sebanyak-banyaknya.</p>
+        </div>
+      </div>
+      <div style="display:flex; gap:12px; align-items:flex-start;">
+        <div
+          style="width:28px; height:28px; border-radius:50%; background:var(--primary); color:white; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:0.85rem; flex-shrink:0;">
+          2</div>
+        <div>
+          <h4 style="margin:0 0 4px; font-size:0.95rem; color:var(--text);">Pilih Hadiahmu</h4>
+          <p style="margin:0; font-size:0.85rem; color:var(--muted); line-height:1.5;">Lihat katalog merchandise di
+            halaman ini dan pastikan poin Anda mencukupi untuk item yang Anda inginkan.</p>
+        </div>
+      </div>
+      <div style="display:flex; gap:12px; align-items:flex-start;">
+        <div
+          style="width:28px; height:28px; border-radius:50%; background:var(--primary); color:white; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:0.85rem; flex-shrink:0;">
+          3</div>
+        <div>
+          <h4 style="margin:0 0 4px; font-size:0.95rem; color:var(--text);">Klaim di Perpustakaan</h4>
+          <p style="margin:0; font-size:0.85rem; color:var(--muted); line-height:1.5;">Datang langsung ke bagian
+            <strong>Customer Service UMS Library</strong>. Tunjukkan akun Leaderboard Anda kepada petugas untuk
+            menukarkan hadiah!
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div
+      style="padding:12px 16px; background:rgba(251,191,36,0.1); border-left:3px solid #fbbf24; border-radius:8px; font-size:0.8rem; color:var(--text); line-height:1.5;">
+      <em>Catatan Penting:</em> Stok merchandise sangat terbatas. Penukaran hanya dapat dilakukan secara
+      <em>offline</em> selama jam kerja perpustakaan.
+    </div>
+  </div>
+</div>
 
 {% endblock %}

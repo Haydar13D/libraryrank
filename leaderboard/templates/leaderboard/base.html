@@ -5,16 +5,22 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>LibraryRank — UMSLibrary Leaderboard</title>
-  <link rel="icon" type="image/png" href="{% static 'img/UMS Lib Polos (1).png' %}">
+  <title>Library Rank — UMSLibrary Leaderboard</title>
+  <link rel="icon" type="image/png" href="{% static 'img/logo4.png' %}">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
-  <link rel="stylesheet" href="{% static 'css/main.css' %}?v=20">
+  <link rel="stylesheet" href="{% static 'css/main.css' %}?v=50">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
-    if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+    // Memaksa default theme menjadi dark agar sesuai dengan desain
+    if (localStorage.getItem('theme') === 'light') {
+      document.documentElement.setAttribute('data-theme', 'light');
+    } else {
       document.documentElement.setAttribute('data-theme', 'dark');
+      localStorage.setItem('theme', 'dark');
     }
   </script>
 </head>
@@ -24,15 +30,25 @@
   <header class="ums-header">
     <div class="header-left">
       <a href="https://library.ums.ac.id/" target="_blank" class="logo-lockup">
-        <img src="{% static 'img/UMS Lib Polos (1).png' %}" alt="UMS Library Logo" class="ums-logo-img logo-light" onerror="this.style.display='none';">
-        <img src="{% static 'img/logo4.png' %}" alt="UMS Library Logo" class="ums-logo-img logo-dark" onerror="this.style.display='none';">
+        <img src="{% static 'img/UMS Lib Polos (1).png' %}" alt="UMS Library Logo" class="ums-logo-img logo-light"
+          onerror="this.style.display='none';">
+        <img src="{% static 'img/logo4.png' %}" alt="UMS Library Logo" class="ums-logo-img logo-dark"
+          onerror="this.style.display='none';">
       </a>
     </div>
 
     <style>
-      .logo-dark { display: none; }
-      html[data-theme='dark'] .logo-light { display: none; }
-      html[data-theme='dark'] .logo-dark { display: block; }
+      .logo-dark {
+        display: none;
+      }
+
+      html[data-theme='dark'] .logo-light {
+        display: none;
+      }
+
+      html[data-theme='dark'] .logo-dark {
+        display: block;
+      }
     </style>
 
     <nav class="header-nav">
@@ -77,7 +93,7 @@
     const CSRF_TOKEN = '{{ csrf_token }}';
   </script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <script src="{% static 'js/main.js' %}?v=10"></script>
+  <script src="{% static 'js/main.js' %}?v=31"></script>
   <script>
     const themeBtn = document.getElementById('themeToggle');
     const themeIcon = document.getElementById('themeIcon');

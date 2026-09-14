@@ -1,0 +1,28 @@
+Otomatis Tiap Semester (auto_semester) (Default):
+Semester Genap: Dimulai otomatis pada 1 Januari.
+Semester Ganjil: Dimulai otomatis pada 1 Juli.
+Klasemen ranking langsung memperhitungkan perolehan XP mulai awal semester berjalan.
+Otomatis Tahunan (auto_yearly):
+Reset ranking otomatis setiap tanggal 1 pada bulan yang dipilih (misal setiap 1 Agustus saat tahun ajaran baru dimulai).
+Manual (manual):
+Admin menentukan tanggal mulai musim secara bebas melalui kolom manual_reset_date. Semua poin sebelum tanggal tersebut tidak dihitung dalam klasemen musim aktif.
+
+
+1. URL Halaman Admin
+Buka URL berikut di browser: 👉 http://localhost:8002/admin/
+
+2. Akun Admin
+Di database sudah terdaftar akun superuser:
+
+Username: admin
+3. Jika Lupa Password / Ingin Mengatur Ulang Password admin:
+Anda bisa mengubah password akun admin langsung via Docker dengan perintah berikut di terminal:
+
+powershell
+docker compose exec web python manage.py changepassword admin
+(Ketik password baru saat diminta)
+
+4. Atau Jika Ingin Membuat Akun Superuser Baru:
+powershell
+docker compose exec web python manage.py createsuperuser
+(Ikuti petunjuk untuk mengisi username, email, dan password)

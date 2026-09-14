@@ -245,11 +245,6 @@ UNFOLD = {
                         "icon": "account_balance",
                         "link": reverse_lazy("admin:leaderboard_faculty_changelist"),
                     },
-                    {
-                        "title": "Books (Buku)",
-                        "icon": "menu_book",
-                        "link": reverse_lazy("admin:leaderboard_book_changelist"),
-                    },
                 ],
             },
             {

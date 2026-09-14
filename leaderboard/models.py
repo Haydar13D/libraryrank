@@ -5,6 +5,7 @@ from datetime import timedelta
 import uuid
 import csv
 import io
+import os
 
 # ==========================================
 # 1. CORE / MASTER DATA
@@ -395,16 +396,90 @@ class RedemptionClaim(models.Model):
 # ==========================================
 
 class Seminar(models.Model):
-    title = models.CharField(max_length=200, help_text="Judul Seminar")
-    speaker = models.CharField(max_length=100, help_text="Pembicara/Narasumber")
-    description = models.TextField(blank=True, null=True, help_text="Deskripsi Singkat Seminar")
-    date = models.DateTimeField(help_text="Tanggal & Waktu Seminar")
+    CATEGORY_CHOICES = [
+        ('seminar', 'Seminar'),
+        ('workshop', 'Workshop'),
+        ('training', 'Pelatihan / Training'),
+        ('webinar', 'Webinar / Zoom'),
+        ('book_review', 'Bedah Buku'),
+        ('other', 'Lainnya'),
+    ]
+
+    EVENT_MODE_CHOICES = [
+        ('offline', 'Tatap Muka (Offline)'),
+        ('online', 'Daring (Online / Zoom)'),
+        ('hybrid', 'Hybrid (Offline & Online)'),
+    ]
+
+    title = models.CharField(max_length=200, help_text="Judul Acara / Seminar")
+    category = models.CharField(
+        max_length=50,
+        choices=CATEGORY_CHOICES,
+        default='seminar',
+        help_text="Kategori Acara (Seminar, Workshop, Pelatihan, Webinar/Zoom, Bedah Buku, dll)"
+    )
+    event_mode = models.CharField(
+        max_length=20,
+        choices=EVENT_MODE_CHOICES,
+        default='offline',
+        help_text="Metode Pelaksanaan: Tatap Muka (Offline), Daring (Online / Zoom), atau Hybrid"
+    )
+    speaker = models.CharField(max_length=100, help_text="Pembicara / Narasumber / Trainer")
+    description = models.TextField(blank=True, null=True, help_text="Deskripsi Singkat Acara")
+    location = models.CharField(
+        max_length=200,
+        blank=True,
+        null=True,
+        default="Ruang Seminar Perpustakaan UMS",
+        help_text="Lokasi Acara Fisik (misal: Ruang Seminar Lt. 2 Perpustakaan UMS)"
+    )
+    meeting_url = models.URLField(
+        max_length=500,
+        blank=True,
+        null=True,
+        help_text="Link Ruang Virtual (Zoom / Google Meet / Teams) jika acara diselenggarakan daring / hybrid"
+    )
+    image = models.ImageField(
+        upload_to='seminars/',
+        blank=True,
+        null=True,
+        help_text="Poster / Banner Acara (Disarankan aspek rasio 16:9 atau 4:3, resolusi ideal 1200x675px, format JPG/PNG/WebP)"
+    )
+    date = models.DateTimeField(help_text="Tanggal & Waktu Acara")
     registration_open = models.DateTimeField(help_text="Tanggal Dibuka Pendaftaran")
     registration_close = models.DateTimeField(help_text="Tanggal Ditutup Pendaftaran")
     points_register = models.IntegerField(default=2, help_text="Poin untuk mendaftar")
     points_attend = models.IntegerField(default=15, help_text="Poin untuk kehadiran")
     claim_code = models.CharField(max_length=50, unique=True, help_text="Kode Unik Klaim Kehadiran (misal: UMS-SEM-XYZ)")
     claim_code_active = models.BooleanField(default=False, help_text="Apakah klaim kehadiran sedang aktif")
+    # --- E-CERTIFICATE SETTINGS ---
+    cert_template = models.ImageField(
+        upload_to='cert_templates/',
+        blank=True,
+        null=True,
+        help_text="Template Desain Sertifikat Kosong (Format PNG/JPG/WebP, disarankan A4 Landscape resolusi 1920x1080 atau lebih besar)"
+    )
+    cert_name_pos_y = models.IntegerField(default=560, help_text="Posisi vertikal Y untuk Nama Peserta (dalam pixel)")
+    cert_name_font_size = models.IntegerField(default=52, help_text="Ukuran Font Nama Peserta (pt/px)")
+    cert_name_color = models.CharField(max_length=20, default="#1e293b", help_text="Warna teks Nama Peserta (Hex: misal #000000 atau #1e293b)")
+    cert_show_nim = models.BooleanField(default=True, help_text="Tampilkan teks NIM di bawah nama peserta")
+    cert_nim_pos_y = models.IntegerField(default=630, help_text="Posisi vertikal Y untuk NIM Peserta (dalam pixel)")
+    cert_number_template = models.CharField(max_length=150, blank=True, null=True, help_text="Format Nomor Sertifikat (Contoh: UMS/LIB-SEM/2026/{num:03d} atau nomor statis panitia)")
+    cert_number_pos_y = models.IntegerField(default=320, help_text="Posisi vertikal Y untuk Nomor Sertifikat (dalam pixel)")
+    cert_font_family = models.CharField(
+        max_length=50,
+        default="arialbd.ttf",
+        choices=[
+            ("arialbd.ttf", "Arial Bold"),
+            ("arial.ttf", "Arial Regular"),
+            ("timesbd.ttf", "Times New Roman Bold"),
+            ("times.ttf", "Times New Roman Regular"),
+            ("calibrib.ttf", "Calibri Bold"),
+            ("calibri.ttf", "Calibri Regular"),
+        ],
+        help_text="Pilihan Font untuk Nama Peserta"
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -412,6 +487,35 @@ class Seminar(models.Model):
 
     def __str__(self):
         return f"{self.title} ({self.date.strftime('%d %b %Y')})"
+
+    def save(self, *args, **kwargs):
+        if self.image and not getattr(self.image, '_committed', True):
+            try:
+                from PIL import Image
+                img = Image.open(self.image)
+                if img.mode in ("RGBA", "P"):
+                    img = img.convert("RGBA")
+                else:
+                    img = img.convert("RGB")
+                
+                # Resize if overly large (max 1280px width)
+                if img.width > 1280:
+                    ratio = 1280 / float(img.width)
+                    new_height = int(float(img.height) * float(ratio))
+                    img = img.resize((1280, new_height), Image.Resampling.LANCZOS)
+                
+                output = io.BytesIO()
+                if img.mode == "RGBA":
+                    img.save(output, format='PNG', optimize=True)
+                else:
+                    img.save(output, format='JPEG', quality=88, optimize=True)
+                output.seek(0)
+                
+                filename = os.path.basename(self.image.name)
+                self.image = File(output, name=filename)
+            except Exception as e:
+                pass
+        super().save(*args, **kwargs)
 
 
 class SeminarRegistration(models.Model):
@@ -425,6 +529,10 @@ class SeminarRegistration(models.Model):
     registered_at = models.DateTimeField(auto_now_add=True)
     attended_at = models.DateTimeField(null=True, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='registered')
+    
+    # E-Certificate fields
+    certificate_number = models.CharField(max_length=150, blank=True, null=True, help_text="Nomor Sertifikat Peserta")
+    certificate_pdf = models.FileField(upload_to='certificates/', blank=True, null=True, help_text="File PDF E-Sertifikat Peserta")
 
     class Meta:
         ordering = ['-registered_at']
@@ -435,8 +543,20 @@ class SeminarRegistration(models.Model):
 
 
 class SeminarUpload(models.Model):
-    title = models.CharField(max_length=200, help_text="Nama atau Judul Seminar")
-    points = models.IntegerField(default=15, help_text="Jumlah poin yang akan diberikan ke setiap mahasiswa")
+    seminar = models.ForeignKey(
+        'Seminar',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='uploads',
+        help_text="Pilih Event / Seminar yang diselenggarakan"
+    )
+    title = models.CharField(max_length=200, blank=True, help_text="Opsional: Judul/Catatan tambahan")
+    points = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text="Opsional: Poin per peserta (jika dikosongkan, otomatis mengambil dari Kebijakan Poin XP / Event)"
+    )
     csv_file = models.FileField(upload_to='seminars/', help_text="Upload file CSV berisi satu kolom NIM/Cardnumber", blank=True, null=True)
     manual_input = models.TextField(blank=True, help_text="Atau input NIM/Cardnumber mahasiswa di sini (satu NIM per baris)")
     processed = models.BooleanField(default=False)
@@ -444,19 +564,35 @@ class SeminarUpload(models.Model):
 
     class Meta:
         ordering = ['-created_at']
-        verbose_name = 'Input Data Seminar'
-        verbose_name_plural = 'Input Data Seminar'
+        verbose_name = 'Upload Kehadiran (CSV)'
+        verbose_name_plural = 'Upload Kehadiran (CSV)'
 
     def __str__(self):
-        return f"{self.title} ({self.created_at.strftime('%Y-%m-%d')})"
+        sem_title = self.seminar.title if self.seminar else (self.title or "Upload Seminar")
+        return f"{sem_title} ({self.created_at.strftime('%Y-%m-%d')})"
 
     def save(self, *args, **kwargs):
         is_new = self.pk is None
+        
+        # Otomatis ambil kebijakan poin jika tidak diisi manual
+        if self.points is None:
+            policy = PointPolicy.objects.filter(action_type='seminar', is_active=True).first()
+            if policy:
+                self.points = policy.points
+            elif self.seminar and self.seminar.points_attend:
+                self.points = self.seminar.points_attend
+            else:
+                self.points = 15
+
+        if self.seminar and not self.title:
+            self.title = self.seminar.title
+
         super().save(*args, **kwargs)
         
         if not self.processed and (self.csv_file or self.manual_input):
             try:
-                points = self.points
+                points = self.points or 15
+                event_title = self.seminar.title if self.seminar else (self.title or "Seminar")
                 
                 cardnumbers = []
                 
@@ -474,7 +610,7 @@ class SeminarUpload(models.Model):
                         for row in csv_reader:
                             if row and row[0].strip():
                                 cardnumber = row[0].strip()
-                                if cardnumber.lower() not in ['nim', 'cardnumber', 'id']:
+                                if cardnumber.lower() not in ['nim', 'cardnumber', 'id', 'npm', 'username', 'no']:
                                     cardnumbers.append(cardnumber.upper())
                     finally:
                         self.csv_file.close()
@@ -484,7 +620,7 @@ class SeminarUpload(models.Model):
                     for line in self.manual_input.splitlines():
                         for part in line.replace(',', ' ').split():
                             cnum = part.strip()
-                            if cnum and cnum.lower() not in ['nim', 'cardnumber', 'id']:
+                            if cnum and cnum.lower() not in ['nim', 'cardnumber', 'id', 'npm', 'username', 'no']:
                                 cardnumbers.append(cnum.upper())
                                 
                 # Remove duplicates preserving order
@@ -492,17 +628,28 @@ class SeminarUpload(models.Model):
                 
                 if unique_cardnumbers:
                     transactions = []
+                    now = timezone.now()
                     for cardnumber in unique_cardnumbers:
                         transactions.append(PointTransaction(
                             cardnumber=cardnumber,
                             amount=points,
                             transaction_type='seminar',
-                            description=f"Peserta: {self.title}"
+                            description=f"Peserta Seminar: {event_title}"
                         ))
+                        # Update status peserta di SeminarRegistration jika event seminar dipilih
+                        if self.seminar:
+                            SeminarRegistration.objects.update_or_create(
+                                seminar=self.seminar,
+                                member_id=cardnumber,
+                                defaults={
+                                    'status': 'attended',
+                                    'attended_at': now
+                                }
+                            )
                     PointTransaction.objects.bulk_create(transactions)
                 
                 self.processed = True
-                super().save(update_fields=['processed'])
+                super().save(update_fields=['processed', 'points', 'title'])
                 
                 # Clear leaderboard cache automatically
                 from django.core.cache import cache

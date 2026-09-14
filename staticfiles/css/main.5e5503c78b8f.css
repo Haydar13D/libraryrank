@@ -540,30 +540,6 @@ h1, h2, h3, h4, h5, h6,
   outline: none;
 }
 
-.btn-filter {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--primary);
-  background: var(--primary);
-  color: #ffffff;
-  font-family: inherit;
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity 0.12s ease, transform 0.1s ease;
-}
-
-.btn-filter:hover {
-  opacity: 0.92;
-}
-
-.btn-filter:active {
-  transform: scale(0.97);
-}
-
 .btn-exp {
   display: inline-flex;
   align-items: center;
@@ -701,15 +677,6 @@ h1, h2, h3, h4, h5, h6,
   font-weight: 800;
   font-size: 1rem;
   flex-shrink: 0;
-  overflow: hidden;
-  background: var(--surface2);
-}
-
-.nom-avatar-big img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
 }
 
 .nom-info {
@@ -802,13 +769,6 @@ h1, h2, h3, h4, h5, h6,
   font-size: 1.1rem;
   width: 52px;
   height: 52px;
-  overflow: hidden;
-}
-
-.podium-avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
 }
 
 .podium-item.first .podium-avatar {
@@ -968,15 +928,6 @@ h1, h2, h3, h4, h5, h6,
   font-weight: 700;
   font-size: 0.8rem;
   flex-shrink: 0;
-  overflow: hidden;
-  background: var(--surface2);
-}
-
-.lb-avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
 }
 
 .lb-name {

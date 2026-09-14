@@ -11,12 +11,35 @@ document.addEventListener('DOMContentLoaded', () => {
   const savedNim = localStorage.getItem('seminar_nim');
   if (savedNim) {
     const nimInput = document.getElementById('nimInput');
+    const claimNim = document.getElementById('claimNim');
     if (nimInput) nimInput.value = savedNim;
+    if (claimNim) claimNim.value = savedNim;
   }
 
   loadSeminars();
   initModalListeners();
 });
+
+// Tab switching (List vs Claim)
+window.switchSeminarTab = function (tab) {
+  const btnList = document.getElementById('tabBtnList');
+  const btnClaim = document.getElementById('tabBtnClaim');
+  const panelList = document.getElementById('panel-seminar-list');
+  const panelClaim = document.getElementById('panel-seminar-claim');
+
+  if (tab === 'list') {
+    if (btnList) btnList.classList.add('active');
+    if (btnClaim) btnClaim.classList.remove('active');
+    if (panelList) panelList.style.display = 'block';
+    if (panelClaim) panelClaim.style.display = 'none';
+  } else {
+    if (btnList) btnList.classList.remove('active');
+    if (btnClaim) btnClaim.classList.add('active');
+    if (panelList) panelList.style.display = 'none';
+    if (panelClaim) panelClaim.style.display = 'block';
+    populateClaimDropdown();
+  }
+};
 
 // Mode Filter: all | offline | online | hybrid | my
 window.filterSeminarMode = function (mode) {
@@ -97,6 +120,7 @@ window.loadSeminars = async function () {
 
       updateMemberBanner(currentMemberInfo, loadedSeminarsList);
       applyFiltersAndRender();
+      populateClaimDropdown();
     } else {
       if (container) {
         container.innerHTML = `
@@ -124,7 +148,9 @@ window.loadSeminars = async function () {
 window.clearMemberNim = function () {
   localStorage.removeItem('seminar_nim');
   const nimInput = document.getElementById('nimInput');
+  const claimNim = document.getElementById('claimNim');
   if (nimInput) nimInput.value = '';
+  if (claimNim) claimNim.value = '';
   loadSeminars();
 };
 
@@ -486,6 +512,46 @@ window.submitQuickClaim = async function (e) {
   }
 };
 
+// Populate Claim Dropdown select — ONLY shows seminars the member is registered for
+function populateClaimDropdown() {
+  const select = document.getElementById('claimSeminarSelect');
+  if (!select) return;
+
+  const currentSelectVal = select.value;
+  const nim = (document.getElementById('claimNim')?.value || document.getElementById('nimInput')?.value || '').trim();
+
+  if (!nim) {
+    select.innerHTML = '<option value="" disabled selected>-- Masukkan NIM di atas untuk memuat seminar Anda --</option>';
+    return;
+  }
+
+  // ONLY filter seminars where the user has actually registered (registered or attended)
+  const registeredSeminars = loadedSeminarsList.filter(s => s.reg_status === 'registered' || s.reg_status === 'attended');
+
+  if (registeredSeminars.length === 0) {
+    select.innerHTML = '<option value="" disabled selected>-- Belum ada seminar yang Anda daftarkan --</option>';
+    return;
+  }
+
+  select.innerHTML = `
+    <option value="" disabled ${!currentSelectVal ? 'selected' : ''}>-- Pilih Seminar yang Telah Didaftar --</option>
+    ${registeredSeminars.map(sem => `
+      <option value="${sem.id}" ${currentSelectVal == sem.id ? 'selected' : ''} ${sem.reg_status === 'attended' ? 'disabled' : ''}>
+        ${escapeHtml(sem.title)} ${sem.reg_status === 'attended' ? '(Sudah Diklaim / Hadir)' : '(Terdaftar - Siap Klaim)'}
+      </option>
+    `).join('')}
+  `;
+}
+
+// Go to claim tab and preselect seminar
+window.goToClaimTab = function (seminarId) {
+  switchSeminarTab('claim');
+  const select = document.getElementById('claimSeminarSelect');
+  if (select) {
+    select.value = seminarId;
+  }
+};
+
 // Modal Registration Open
 window.openRegModal = async function (seminarId, seminarTitle) {
   const overlay = document.getElementById('seminarRegOverlay');
@@ -539,7 +605,7 @@ async function lookupKohaEmail(nim) {
   }
 }
 
-// Modal Debounced Lookup for registration
+// Modal Debounced Lookup & Claim NIM sync
 function initModalListeners() {
   const regNim = document.getElementById('regNim');
   if (regNim) {
@@ -552,6 +618,25 @@ function initModalListeners() {
       debounceTimer = setTimeout(() => {
         lookupKohaEmail(val);
       }, 400);
+    });
+  }
+
+  const claimNim = document.getElementById('claimNim');
+  if (claimNim) {
+    let claimDebounce = null;
+    claimNim.addEventListener('input', () => {
+      clearTimeout(claimDebounce);
+      const val = claimNim.value.trim();
+      claimDebounce = setTimeout(async () => {
+        if (val) {
+          localStorage.setItem('seminar_nim', val);
+          const nimInput = document.getElementById('nimInput');
+          if (nimInput) nimInput.value = val;
+          await loadSeminars();
+        } else {
+          populateClaimDropdown();
+        }
+      }, 500);
     });
   }
 }
@@ -590,6 +675,63 @@ window.submitSeminarRegistration = async function (e) {
       loadSeminars();
     } else {
       showToast('<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>', data.error || 'Gagal mendaftar.', 4000);
+    }
+  } catch (err) {
+    console.error(err);
+    showToast('<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>', 'Terjadi kesalahan jaringan.', 3000);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = origText;
+  }
+};
+
+// Submit Attendance Claim
+window.handleClaimAttendance = async function (e) {
+  e.preventDefault();
+
+  const btn = e.target.querySelector('button[type="submit"]');
+  const origText = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = 'Memproses klaim...';
+
+  const memberId = document.getElementById('claimNim').value.trim();
+  const seminarId = document.getElementById('claimSeminarSelect').value;
+  const claimCode = document.getElementById('claimCode').value.trim();
+
+  if (!seminarId) {
+    showToast('<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>', 'Silakan pilih seminar terlebih dahulu.', 3000);
+    btn.disabled = false;
+    btn.innerHTML = origText;
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/seminar/claim/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': typeof CSRF_TOKEN !== 'undefined' ? CSRF_TOKEN : ''
+      },
+      body: JSON.stringify({ member_id: memberId, seminar_id: seminarId, claim_code: claimCode })
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      const msg = data.certificate_url
+        ? `${data.message} E-Sertifikat PDF siap diunduh!`
+        : data.message;
+      showToast('<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 12 20 22 4 22 4 12"></polyline><rect x="2" y="7" width="20" height="5"></rect><line x1="12" y1="22" x2="12" y2="7"></line><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"></path><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"></path></svg>', msg, 6000);
+
+      document.getElementById('claimCode').value = '';
+      const nimInput = document.getElementById('nimInput');
+      if (nimInput) nimInput.value = memberId;
+      localStorage.setItem('seminar_nim', memberId);
+
+      // Reload seminars
+      await loadSeminars();
+      switchSeminarTab('list');
+    } else {
+      showToast('<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>', data.error || 'Gagal mengklaim kehadiran.', 4000);
     }
   } catch (err) {
     console.error(err);

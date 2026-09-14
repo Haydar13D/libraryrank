@@ -91,6 +91,35 @@ def _get_satellite_visits(date_from, date_to_plus_1):
         return {}
 
 
+def _get_koha_auth_maps():
+    """
+    Cache mapping dari category PRODI, FAKULTAS, UNIT, dan category description di Koha.
+    """
+    cached = cache.get("koha_auth_values_map")
+    if cached is not None:
+        return cached
+    try:
+        mapping = {}
+        with connections['koha'].cursor() as cursor:
+            cursor.execute("""
+                SELECT category, authorised_value, lib
+                FROM authorised_values
+                WHERE category IN ('PRODI', 'FAKULTAS', 'UNIT')
+            """)
+            for cat, code, lib in cursor.fetchall():
+                if cat and code and lib:
+                    mapping[(cat.upper(), code.strip().upper())] = lib.strip()
+            
+            cursor.execute("SELECT categorycode, description FROM categories")
+            for ccode, cdesc in cursor.fetchall():
+                if ccode and cdesc:
+                    mapping[('CAT', ccode.strip().upper())] = cdesc.strip()
+                    
+        cache.set("koha_auth_values_map", mapping, 3600)
+        return mapping
+    except Exception:
+        return {}
+
 def get_live_members(date_from, date_to, search_q=None):
     """
     Executes a direct query to Koha using memory aggregations.
@@ -119,15 +148,21 @@ def get_live_members(date_from, date_to, search_q=None):
     with connections['koha'].cursor() as cursor:
         params = [date_from, date_to_plus_1, date_from, date_to_plus_1, date_from, date_to_plus_1]
 
-        # We group first internally, then join to borrowers. This is standard fast SQL.
+        # We group first internally, then join to borrowers and attributes.
         sql = """
         SELECT
             b.borrowernumber, b.cardnumber, b.firstname, b.surname, b.categorycode, b.branchcode, b.dateenrolled,
             IFNULL(v.visit_count, 0) as visit_count,
-            IFNULL(i.issue_count, 0) + IFNULL(oi.old_issue_count, 0) as borrow_count
+            IFNULL(i.issue_count, 0) + IFNULL(oi.old_issue_count, 0) as borrow_count,
+            ap.attribute as prodi_attr,
+            au.attribute as unit_attr,
+            af.attribute as fak_attr
         FROM borrowers b
+        LEFT JOIN borrower_attributes ap ON b.borrowernumber = ap.borrowernumber AND ap.code = 'PRODI'
+        LEFT JOIN borrower_attributes au ON b.borrowernumber = au.borrowernumber AND au.code = 'UNIT'
+        LEFT JOIN borrower_attributes af ON b.borrowernumber = af.borrowernumber AND af.code = 'FAKULTAS'
         LEFT JOIN (
-            SELECT borrowernumber, COUNT(*) as visit_count 
+            SELECT borrowernumber, COUNT(DISTINCT DATE(datetime)) as visit_count 
             FROM statistics 
             WHERE datetime >= %s AND datetime < %s AND type IN ('issue', 'localuse', 'return') 
             GROUP BY borrowernumber
@@ -167,6 +202,7 @@ def get_live_members(date_from, date_to, search_q=None):
         pass
 
     members = []
+    auth_maps = _get_koha_auth_maps()
     
     # Dynamic Point Policies
     try:
@@ -220,15 +256,15 @@ def get_live_members(date_from, date_to, search_q=None):
         seminar_counts = {}
     
     for row in rows:
-        borrowernumber, card, fname, sname, cat, branch, enrolled, v_cnt, b_cnt = row
+        borrowernumber, card, fname, sname, cat, branch, enrolled, v_cnt, b_cnt, prodi_attr, unit_attr, fak_attr = row
         v_cnt = v_cnt or 0
         b_cnt = b_cnt or 0
 
-        # Gabungkan kunjungan dari satellite (gate scan) + Koha statistics
-        # Ambil mana yang lebih besar (gate scan biasanya lebih banyak)
+        # Kunjungan fisik: Ambil dari Gate Scanner (visitorhistory) sebagai sumber utama
+        # Fallback ke transaksi sirkulasi (distinct hari) jika tidak ada data gate scan
         card_str = str(card).strip() if card else ''
         sat_v_cnt = satellite_visits.get(card_str, 0)
-        v_cnt = max(v_cnt, sat_v_cnt)
+        v_cnt = sat_v_cnt if sat_v_cnt > 0 else v_cnt
 
         full_name = f"{(fname or '').strip()} {(sname or '').strip()}".strip() or str(card)
         role = _get_role_from_category(cat)
@@ -242,8 +278,41 @@ def get_live_members(date_from, date_to, search_q=None):
         if 'STATISTICAL' in name_upper or 'ADMIN' in name_upper or 'STAT' in cat_upper:
             continue
             
-        faculty = _get_faculty_name(branch)
+        # Pencocokan Prodi / Unit / Fakultas dari Koha
+        p_code = (prodi_attr or '').strip().upper()
+        u_code = (unit_attr or '').strip().upper()
+        f_code = (fak_attr or '').strip().upper()
+
+        faculty = ''
+        if p_code and ('PRODI', p_code) in auth_maps:
+            faculty = auth_maps[('PRODI', p_code)]
+        elif u_code and ('UNIT', u_code) in auth_maps:
+            faculty = auth_maps[('UNIT', u_code)]
+        elif f_code and ('FAKULTAS', f_code) in auth_maps:
+            faculty = auth_maps[('FAKULTAS', f_code)]
+
+        # Fallback 1: NIM 4-character prefix match (e.g. D100220211 -> D100 -> FT/ S1 Teknik Sipil)
+        if not faculty and card_str and len(card_str) >= 4:
+            prefix_4 = card_str[:4].upper()
+            if ('PRODI', prefix_4) in auth_maps:
+                faculty = auth_maps[('PRODI', prefix_4)]
+            elif len(card_str) >= 1:
+                prefix_1 = card_str[0].upper()
+                if ('FAKULTAS', prefix_1) in auth_maps:
+                    faculty = auth_maps[('FAKULTAS', prefix_1)]
+
+        # Fallback 2: Staff / Category description or Branchcode
+        if not faculty:
+            cat_code = (cat or '').strip().upper()
+            if ('CAT', cat_code) in auth_maps:
+                cat_desc = auth_maps[('CAT', cat_code)]
+                if cat_desc not in ['Mahasiswa S1/D3', 'Mahasiswa Pasca Sarjana/Profesi']:
+                    faculty = cat_desc
+            if not faculty:
+                faculty = _get_faculty_name(branch)
+
         year_enrolled = enrolled.year if hasattr(enrolled, 'year') else ''
+        sub = f"{faculty} · {year_enrolled}" if (faculty and year_enrolled) else (faculty or "")
         
         visit_points = v_cnt * v_mult
         borrow_points = b_cnt * b_mult
@@ -262,12 +331,6 @@ def get_live_members(date_from, date_to, search_q=None):
                 badges.append({'id': br.id_code, 'name': br.name, 'icon': br.icon, 'color': br.color, 'desc': br.desc, 'image_url': br.image_url})
             elif br.criteria_type == 'borrows_semester' and b_cnt >= br.min_value:
                 badges.append({'id': br.id_code, 'name': br.name, 'icon': br.icon, 'color': br.color, 'desc': br.desc, 'image_url': br.image_url})
-
-        if faculty:
-            sub = f"{card} · {faculty}"
-        else:
-            sub = f"{card}"
-
         s_cnt = seminar_counts.get(str(card), 0)
 
         # Calculate level dynamically based on total_p

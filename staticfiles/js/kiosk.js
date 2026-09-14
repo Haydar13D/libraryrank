@@ -198,13 +198,25 @@ function initThemeToggle() {
    ------------------------------------------------------------- */
 async function fetchKioskData() {
   try {
-    const res = await fetch('/api/overview/');
-    if (!res.ok) throw new Error('Failed to fetch overview');
-    const data = await res.json();
+    const [overviewRes, facultiesRes] = await Promise.all([
+      fetch('/api/overview/'),
+      fetch('/api/faculties/')
+    ]);
+    
+    if (!overviewRes.ok) throw new Error('Failed to fetch overview');
+    const data = await overviewRes.json();
+    
+    let faculties = [];
+    if (facultiesRes.ok) {
+      try {
+        const facData = await facultiesRes.json();
+        faculties = facData.faculties || [];
+      } catch (e) {}
+    }
 
     renderLeaderboardSlide(data.leaderboard || []);
-    renderFacultiesSlide(data.faculties || []);
-    renderStatsSlide(data);
+    renderFacultiesSlide(faculties.length > 0 ? faculties : (data.faculties || []));
+    renderStatsSlide(data, faculties);
   } catch (err) {
     console.error('Error fetching kiosk data:', err);
   }
@@ -236,21 +248,21 @@ function renderLeaderboardSlide(members) {
   if (rank1) {
     document.getElementById('podiumName1').textContent = rank1.name || rank1.id;
     document.getElementById('podiumSub1').textContent = rank1.faculty ? `${rank1.faculty} • ${rank1.id}` : (rank1.id || '');
-    document.getElementById('podiumXp1').textContent = `${(rank1.visits || 0).toLocaleString()} XP`;
+    document.getElementById('podiumXp1').textContent = `${(rank1.visits || 0).toLocaleString('id-ID')} XP`;
     document.getElementById('podiumAvatar1').textContent = getInitials(rank1.name);
   }
 
   if (rank2) {
     document.getElementById('podiumName2').textContent = rank2.name || rank2.id;
     document.getElementById('podiumSub2').textContent = rank2.faculty ? `${rank2.faculty} • ${rank2.id}` : (rank2.id || '');
-    document.getElementById('podiumXp2').textContent = `${(rank2.visits || 0).toLocaleString()} XP`;
+    document.getElementById('podiumXp2').textContent = `${(rank2.visits || 0).toLocaleString('id-ID')} XP`;
     document.getElementById('podiumAvatar2').textContent = getInitials(rank2.name);
   }
 
   if (rank3) {
     document.getElementById('podiumName3').textContent = rank3.name || rank3.id;
     document.getElementById('podiumSub3').textContent = rank3.faculty ? `${rank3.faculty} • ${rank3.id}` : (rank3.id || '');
-    document.getElementById('podiumXp3').textContent = `${(rank3.visits || 0).toLocaleString()} XP`;
+    document.getElementById('podiumXp3').textContent = `${(rank3.visits || 0).toLocaleString('id-ID')} XP`;
     document.getElementById('podiumAvatar3').textContent = getInitials(rank3.name);
   }
 
@@ -273,7 +285,7 @@ function renderLeaderboardSlide(members) {
           </div>
         </div>
         <div class="runner-right">
-          <div class="runner-xp">${(m.visits || 0).toLocaleString()} XP</div>
+          <div class="runner-xp">${(m.visits || 0).toLocaleString('id-ID')} XP</div>
           <div class="runner-level">${m.level ? m.level.name : 'Reader'}</div>
         </div>
       `;
@@ -296,7 +308,7 @@ function renderFacultiesSlide(faculties) {
     card.className = `faculty-kiosk-card ${isTop ? 'top-rank' : ''}`;
 
     const color = fac.color || '#1cbdb3';
-    const totalXP = (fac.points || fac.visits || 0).toLocaleString();
+    const totalXP = (fac.points || fac.visits || 0).toLocaleString('id-ID');
     const students = fac.student_count || fac.members_count || '-';
 
     card.innerHTML = `
@@ -324,22 +336,30 @@ function renderFacultiesSlide(faculties) {
   });
 }
 
-function renderStatsSlide(data) {
-  // Counters
-  const totalVisits = data.total_visits || 0;
-  const totalBorrows = data.total_borrows || 0;
-  const activeMembers = data.active_members || (data.leaderboard ? data.leaderboard.length : 0);
-  const topFaculty = data.top_faculty ? data.top_faculty.name : (data.faculties && data.faculties[0] ? data.faculties[0].name : '-');
+function renderStatsSlide(data, faculties = []) {
+  // Counters from nested data.stats or root
+  const stats = data.stats || {};
+  const totalVisits = stats.total_visitors !== undefined ? stats.total_visitors : (data.total_visits || 0);
+  const totalBorrows = stats.total_books !== undefined ? stats.total_books : (data.total_borrows || 0);
+  const activeMembers = stats.active_members !== undefined ? stats.active_members : (data.active_members || (data.leaderboard ? data.leaderboard.length : 0));
+  
+  let topFacultyName = '-';
+  if (data.top_faculty && data.top_faculty.name) {
+    topFacultyName = data.top_faculty.name;
+  } else if (faculties && faculties.length > 0) {
+    const sortedFac = [...faculties].sort((a, b) => (b.points || b.visits || b.visitors || 0) - (a.points || a.visits || a.visitors || 0));
+    topFacultyName = sortedFac[0].name;
+  }
 
   const elV = document.getElementById('statVisits');
   const elB = document.getElementById('statBorrows');
   const elM = document.getElementById('statMembers');
   const elF = document.getElementById('statTopFaculty');
 
-  if (elV) elV.textContent = totalVisits.toLocaleString();
-  if (elB) elB.textContent = totalBorrows.toLocaleString();
-  if (elM) elM.textContent = activeMembers.toLocaleString();
-  if (elF) elF.textContent = topFaculty;
+  if (elV) elV.textContent = Number(totalVisits).toLocaleString('id-ID');
+  if (elB) elB.textContent = Number(totalBorrows).toLocaleString('id-ID');
+  if (elM) elM.textContent = Number(activeMembers).toLocaleString('id-ID');
+  if (elF) elF.textContent = topFacultyName;
 
   // Render Daily Visits Chart
   const canvas = document.getElementById('kioskDailyChart');

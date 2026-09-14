@@ -638,14 +638,57 @@ class SeminarUpload(models.Model):
                         ))
                         # Update status peserta di SeminarRegistration jika event seminar dipilih
                         if self.seminar:
-                            SeminarRegistration.objects.update_or_create(
+                            member = Member.objects.filter(member_id=cardnumber).first()
+                            member_name = member.name if member else cardnumber
+                            member_email = member.email if (member and member.email) else f"{cardnumber.lower()}@student.ums.ac.id"
+                            
+                            reg, created = SeminarRegistration.objects.update_or_create(
                                 seminar=self.seminar,
                                 member_id=cardnumber,
                                 defaults={
                                     'status': 'attended',
-                                    'attended_at': now
+                                    'attended_at': now,
+                                    'email': member_email,
                                 }
                             )
+                            
+                            # Generate certificate & send email automatically
+                            if self.seminar.cert_template:
+                                try:
+                                    from .cert_utils import generate_certificate_pdf, send_certificate_email
+                                    generate_certificate_pdf(reg, member_name=member_name)
+                                    send_certificate_email(reg, member_name=member_name)
+                                except Exception as cert_err:
+                                    print(f"Error auto-generating certificate for {cardnumber}: {cert_err}")
+                            else:
+                                # Fallback email confirmation without certificate
+                                try:
+                                    from django.core.mail import send_mail
+                                    from django.conf import settings
+                                    subject = f"[UMSLibrary] Konfirmasi Kehadiran Seminar Berhasil - {self.seminar.title}"
+                                    message = f"""Halo {member_name},
+
+Selamat! Konfirmasi kehadiran Anda untuk seminar berikut telah berhasil diproses:
+
+• Judul Seminar : {self.seminar.title}
+• Tanggal/Waktu : {self.seminar.date.strftime('%d %B %Y %H:%M')}
+• Poin Tambahan : +{points} XP (Kehadiran)
+
+Terima kasih telah berpartisipasi dalam kegiatan UMSLibrary!
+
+Salam Hangat,
+Team UMSLibrary
+"""
+                                    send_mail(
+                                        subject,
+                                        message,
+                                        settings.DEFAULT_FROM_EMAIL or 'noreply@ums.ac.id',
+                                        [reg.email],
+                                        fail_silently=True
+                                    )
+                                except Exception:
+                                    pass
+
                     PointTransaction.objects.bulk_create(transactions)
                 
                 self.processed = True

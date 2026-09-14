@@ -111,18 +111,11 @@ function bindControls() {
   });
 
   // Date filters
-  const applyDateFilter = () => {
+  document.getElementById('btnFilter')?.addEventListener('click', () => {
     currentDateFrom = document.getElementById('dateFrom')?.value || '';
     currentDateTo = document.getElementById('dateTo')?.value || '';
     loadTab(currentTab);
-    if (typeof showToast === 'function') {
-      showToast(ICONS.chart(18, 'var(--primary)'), `Filter diterapkan: ${currentDateFrom} s/d ${currentDateTo}`);
-    }
-  };
-
-  document.getElementById('btnFilter')?.addEventListener('click', applyDateFilter);
-  document.getElementById('dateFrom')?.addEventListener('change', applyDateFilter);
-  document.getElementById('dateTo')?.addEventListener('change', applyDateFilter);
+  });
 
   // Quick Preset Buttons
   document.querySelectorAll('.preset-btn').forEach(btn => {
@@ -239,14 +232,12 @@ async function updateQuickSearch(q) {
       document.getElementById('quickName').textContent = p.name;
       document.getElementById('quickFaculty').textContent = p.id + ' • ' + (p.faculty || '');
       document.getElementById('quickXP').textContent = p.visits + ' XP';
+      document.getElementById('quickAvatar').textContent = p.initials;
 
       const role = p.role || 'student';
       const { bg, text } = ROLE_COLORS[role] || ROLE_COLORS.student;
-      const qAvatar = document.getElementById('quickAvatar');
-      qAvatar.style.background = bg;
-      qAvatar.style.color = text;
-      qAvatar.style.overflow = 'hidden';
-      qAvatar.innerHTML = `<img src="https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(p.name || p.id)}" alt="${p.name}" style="width:100%; height:100%; object-fit:cover;" onerror="this.outerHTML='<span style=\\'background:${bg};color:${text};width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-weight:700;\\'>${p.initials}</span>';">`;
+      document.getElementById('quickAvatar').style.background = bg;
+      document.getElementById('quickAvatar').style.color = text;
 
       quickCard.style.display = 'flex';
       quickCard.onclick = () => fetchMemberDetail(p.id, role);
@@ -433,9 +424,7 @@ function renderNominations(noms) {
           <div style="color:var(--gold); display:flex; align-items:center;">${ICONS.crown(18, 'var(--gold)')}</div>
         </div>
         <div class="nom-card-body">
-          <div class="nom-avatar-big" style="background:${bg};color:${text}">
-            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(n.name || n.id)}" alt="${n.name}" style="width:100%; height:100%; object-fit:cover;" onerror="this.outerHTML='<span style=\\'background:${bg};color:${text};width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-weight:800;\\'>${n.initials}</span>';">
-          </div>
+          <div class="nom-avatar-big" style="background:${bg};color:${text}">${n.initials}</div>
           <div class="nom-info">
             <div class="nom-winner">${n.name}</div>
             <div class="nom-detail">${n.faculty}${n.title ? ' · ' + n.title : ''}</div>
@@ -466,15 +455,13 @@ function renderList(containerId, items, forceRole, showRoleTag = false, scoreKey
       <div class="lb-item ${rankCls}" data-id="${p.id}" data-role="${role}">
         <div class="lb-col lb-col-rank ${rankCls}">${rankEl}</div>
         <div class="lb-col lb-col-user">
-          <div class="lb-avatar" style="background:${bg};color:${text}">
-            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(p.name || p.id)}" alt="${p.name}" style="width:100%; height:100%; object-fit:cover;" onerror="this.outerHTML='<span style=\\'background:${bg};color:${text};width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.8rem;\\'>${p.initials}</span>';">
-          </div>
+          <div class="lb-avatar" style="background:${bg};color:${text}">${p.initials}</div>
           <div class="lb-info">
             <div class="lb-name">${p.name}</div>
-            <div class="lb-sub">@${(p.id || '').toString().toLowerCase()}</div>
+            <div class="lb-sub">@${(p.id || p.sub || '').toString().toLowerCase()}</div>
           </div>
         </div>
-        <div class="lb-col lb-col-dept">${p.faculty || p.sub || '-'}</div>
+        <div class="lb-col lb-col-dept">${p.sub || p.faculty || '-'}</div>
         <div class="lb-col lb-col-score">${Number(p[scoreKey] ?? p.visits ?? 0).toLocaleString()}${scoreLabel === 'XP' ? ' <span style="font-size:0.75em; font-weight:700; color:var(--muted);">XP</span>' : ''}</div>
       </div>`;
   }).join('');
@@ -518,12 +505,12 @@ function renderPodium(containerId, items, role) {
       <div class="podium-item ${cfg.cls}" data-id="${p.id}" data-role="${itemRole}">
         <div class="podium-avatar-wrap">
           ${cfg.cls === 'first' ? `<div class="podium-crown">${ICONS.crown(28, '#F59E0B')}</div>` : ''}
-          <div class="podium-avatar" style="border: 2px solid ${cfg.medalColor}; background:var(--surface2);">
-            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(p.name || p.id)}" alt="${p.name}" style="width:100%; height:100%; object-fit:cover;" onerror="this.outerHTML='<span style=\\'background:${bg};color:${text};width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-weight:800;\\'>${p.initials}</span>';">
+          <div class="podium-avatar" style="background:${bg};color:${text}">
+            ${p.initials}
           </div>
         </div>
         <div class="podium-name">${p.name}</div>
-        <div class="podium-dept">${p.faculty || p.sub || ''}</div>
+        <div class="podium-dept">${p.sub || p.faculty || ''}</div>
         <div class="podium-base">
           <div class="podium-rank-badge" style="color:${cfg.medalColor}">
             ${ICONS.medal(18, cfg.medalColor)}
@@ -619,9 +606,7 @@ function renderTopPerFaculty(topList) {
     const { bg, text } = ROLE_COLORS[t.role] || ROLE_COLORS.student;
     return `
       <div class="book-item">
-        <div class="lb-avatar" style="${bg ? `background:${bg};color:${text}` : ''};width:36px;height:36px;font-size:.85rem;flex-shrink:0">
-          <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(t.name || t.id)}" alt="${t.name}" style="width:100%; height:100%; object-fit:cover;" onerror="this.outerHTML='<span style=\\'background:${bg};color:${text};width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.85rem;\\'>${t.initials}</span>';">
-        </div>
+        <div class="lb-avatar" style="${bg ? `background:${bg};color:${text}` : ''};width:36px;height:36px;font-size:.85rem;flex-shrink:0">${t.initials}</div>
         <div class="book-info">
           <div class="book-title">${t.name}</div>
           <div class="book-author">${t.faculty}</div>
@@ -707,9 +692,7 @@ function renderModal(data, role) {
 
   document.getElementById('modalBody').innerHTML = `
     <div id="captureCard" style="padding:4px 0 10px; text-align:center;">
-      <div class="modal-avatar" style="border: 3px solid ${lvl.color}; background:var(--surface2); margin:0 auto 14px; width:76px; height:76px; border-radius:50%; overflow:hidden; display:flex; align-items:center; justify-content:center;">
-        <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(data.name || data.id)}" alt="${data.name}" style="width:100%; height:100%; object-fit:cover;" onerror="this.outerHTML='<span style=\\'font-weight:800; font-size:1.6rem; color:${text};\\'>${data.initials}</span>';">
-      </div>
+      <div class="modal-avatar" style="border: 3px solid ${lvl.color}; background:${bg};color:${text};margin:0 auto 14px;width:76px;height:76px;font-size:1.8rem;line-height:70px;">${data.initials}</div>
       <div class="modal-name" style="font-size:1.25rem; font-weight:800; color:var(--text); margin-bottom:4px;">${data.name}</div>
       <div class="modal-sub" style="font-size:0.82rem; color:var(--muted); margin-bottom:18px;">${data.id} · ${data.faculty || data.department || ''} ${data.year ? '· ' + data.year : ''}</div>
       

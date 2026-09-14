@@ -594,10 +594,18 @@ def api_seminar_list(request):
     seminars = Seminar.objects.all().order_by('-date')
     
     registration_map = {}
+    member_info = None
     if member_id:
         regs = SeminarRegistration.objects.filter(member_id=member_id)
         for r in regs:
             registration_map[r.seminar_id] = r
+        member_obj = Member.objects.filter(member_id=member_id).first()
+        if member_obj:
+            member_info = {
+                'member_id': member_obj.member_id,
+                'name': member_obj.name,
+                'email': member_obj.email or f"{member_obj.member_id.lower()}@student.ums.ac.id"
+            }
             
     seminar_list = []
     for sem in seminars:
@@ -613,6 +621,10 @@ def api_seminar_list(request):
             if reg_obj.status == 'attended' and reg_obj.certificate_pdf:
                 cert_url = reg_obj.certificate_pdf.url
             
+        meeting_accessible_url = None
+        if reg_status in ['registered', 'attended'] and sem.meeting_url:
+            meeting_accessible_url = sem.meeting_url
+            
         seminar_list.append({
             'id': sem.id,
             'title': sem.title,
@@ -621,7 +633,8 @@ def api_seminar_list(request):
             'event_mode': getattr(sem, 'event_mode', 'offline'),
             'event_mode_display': sem.get_event_mode_display() if hasattr(sem, 'get_event_mode_display') else 'Tatap Muka (Offline)',
             'location': sem.location or 'Ruang Seminar Perpustakaan UMS',
-            'meeting_url': sem.meeting_url if sem.meeting_url else None,
+            'meeting_url': meeting_accessible_url,
+            'has_meeting_url': bool(sem.meeting_url),
             'speaker': sem.speaker,
             'description': sem.description,
             'image_url': sem.image.url if sem.image else None,
@@ -638,7 +651,7 @@ def api_seminar_list(request):
             'reg_status': reg_status,
         })
         
-    return JsonResponse({'success': True, 'seminars': seminar_list})
+    return JsonResponse({'success': True, 'seminars': seminar_list, 'member': member_info})
 
 
 @csrf_exempt
@@ -656,16 +669,19 @@ def api_register_seminar(request):
         data = request.POST
         
     member_id = data.get('member_id', '').strip().upper()
-    email = data.get('email', '').strip().lower()
+    email_input = data.get('email', '').strip().lower()
     seminar_id = data.get('seminar_id')
     
-    if not member_id or not email or not seminar_id:
-        return JsonResponse({'success': False, 'error': 'NIM, Email, dan ID Seminar harus diisi.'}, status=400)
+    if not member_id or not seminar_id:
+        return JsonResponse({'success': False, 'error': 'NIM dan ID Seminar harus diisi.'}, status=400)
         
     # Validate member exists in the local database
     member = Member.objects.filter(member_id=member_id).first()
     if not member:
         return JsonResponse({'success': False, 'error': 'NIM Anda tidak terdaftar di database perpustakaan.'}, status=404)
+        
+    # Prefer official member email from Koha sync if available
+    effective_email = member.email.strip().lower() if (member.email and member.email.strip()) else (email_input or f"{member_id.lower()}@student.ums.ac.id")
         
     # Find seminar
     seminar = Seminar.objects.filter(id=seminar_id).first()
@@ -690,7 +706,7 @@ def api_register_seminar(request):
             SeminarRegistration.objects.create(
                 seminar=seminar,
                 member_id=member_id,
-                email=email,
+                email=effective_email,
                 status='registered'
             )
             PointTransaction.objects.create(
@@ -704,26 +720,36 @@ def api_register_seminar(request):
         try:
             from django.core.mail import send_mail
             from django.conf import settings
+            
+            # Additional details for online / offline
+            location_info = ""
+            mode_display = seminar.get_event_mode_display() if hasattr(seminar, 'get_event_mode_display') else 'Tatap Muka'
+            if seminar.event_mode in ['online', 'hybrid'] and seminar.meeting_url:
+                location_info = f"• Metode Pelaksanaan: {mode_display}\n• Link Ruang Virtual  : {seminar.meeting_url}"
+            else:
+                location_info = f"• Metode Pelaksanaan: {mode_display}\n• Lokasi Pelaksanaan : {seminar.location or 'Ruang Seminar Perpustakaan UMS'}"
+                
             subject = f"[UMSLibrary] Konfirmasi Pendaftaran Seminar - {seminar.title}"
             message = f"""Halo {member.name},
 
 Pendaftaran Anda untuk seminar berikut telah berhasil diproses:
 
-• Judul Seminar : {seminar.title}
-• Pembicara     : {seminar.speaker}
-• Tanggal/Waktu : {seminar.date.strftime('%d %B %Y %H:%M')}
-• Poin Terkumpul: +{seminar.points_register} XP (Pendaftaran)
+• Judul Seminar     : {seminar.title}
+• Pembicara         : {seminar.speaker}
+• Tanggal/Waktu     : {seminar.date.strftime('%d %B %Y %H:%M')}
+{location_info}
+• Poin Pendaftaran  : +{seminar.points_register} XP
 
-Jangan lupa hadir pada hari H. Di akhir seminar, Anda dapat mengklaim poin kehadiran sebesar +{seminar.points_attend} XP dengan memasukkan Kode Unik yang dibagikan oleh panitia.
+Jangan lupa hadir pada waktu yang ditentukan. Di akhir sesi seminar, Anda dapat mengklaim kehadiran (+{seminar.points_attend} XP) dan mengunduh E-Sertifikat dengan memasukkan Kode Unik yang dibagikan oleh panitia.
 
 Salam Hangat,
-Team UMSLibrary
+Perpustakaan Universitas Muhammadiyah Surakarta
 """
             send_mail(
                 subject,
                 message,
                 settings.DEFAULT_FROM_EMAIL or 'noreply@ums.ac.id',
-                [email],
+                [effective_email],
                 fail_silently=True
             )
         except Exception:
@@ -786,6 +812,9 @@ def api_claim_seminar_attendance(request):
         with transaction.atomic():
             reg.status = 'attended'
             reg.attended_at = timezone.now()
+            member = Member.objects.filter(member_id=member_id).first()
+            if member and member.email and member.email.strip():
+                reg.email = member.email.strip().lower()
             reg.save()
             
             PointTransaction.objects.create(
@@ -796,7 +825,6 @@ def api_claim_seminar_attendance(request):
             )
             
         # Generate Certificate & Send Email
-        member = Member.objects.filter(member_id=member_id).first()
         member_name = member.name if member else member_id
         cert_url = None
 

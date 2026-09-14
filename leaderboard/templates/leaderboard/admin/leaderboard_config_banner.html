@@ -1,0 +1,37 @@
+{% load unfold %}
+<div class="mb-6 bg-white dark:bg-base-900 border border-base-200 dark:border-base-800 rounded-xl p-5 shadow-sm">
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+            <div class="flex items-center gap-2 mb-1">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span>
+                    Sistem Perhitungan XP Aktif
+                </span>
+            </div>
+            <h3 class="text-lg font-bold text-base-900 dark:text-base-100">
+                Poin & Klasemen Dihitung Sejak: 
+                <span class="text-primary-600 dark:text-primary-400 underline decoration-dashed underline-offset-4">
+                    {{ active_reset_date_formatted }}
+                </span>
+            </h3>
+            <p class="text-xs text-base-500 dark:text-base-400 mt-1 max-w-2xl">
+                Semua kunjungan, peminjaman buku Koha, dan event setelah tanggal tersebut dihitung ke dalam leaderboard musim ini. Aktivitas sebelum tanggal tersebut tersimpan aman sebagai riwayat arsip.
+            </p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+            <a href="{% url 'admin:leaderboard_config_reset_today' %}" 
+               onclick="return confirm('Apakah Anda yakin ingin me-reset klasemen mulai HARI INI? Semua mahasiswa akan mulai dari 0 XP untuk aktivitas ke depan.');"
+               class="inline-flex items-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg shadow transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                ⚡ Reset Mulai Hari Ini (0 XP)
+            </a>
+            <a href="{% url 'admin:leaderboard_config_auto_semester' %}" 
+               onclick="return confirm('Kembalikan ke sistem Otomatis Tiap Semester (Januari & Juli)?');"
+               class="inline-flex items-center gap-1.5 px-4 py-2 bg-base-100 hover:bg-base-200 dark:bg-base-800 dark:hover:bg-base-700 text-base-700 dark:text-base-200 text-xs font-semibold rounded-lg border border-base-300 dark:border-base-700 shadow-sm transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                🔄 Kembalikan ke Otomatis Semester
+            </a>
+        </div>
+    </div>
+</div>

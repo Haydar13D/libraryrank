@@ -359,41 +359,41 @@ function renderSeminarCards(seminars) {
       <div class="${cardClass}">
         ${posterHtml}
         
-        <div class="sem-card-body">
-          <div class="sem-badge-row">
-            <div class="sem-badges-left">
-              ${catBadge}
-              ${modeBadge}
-              ${statusBadge}
+        <div class="sem-card-content">
+          <div class="sem-card-body">
+            <div class="sem-badge-row">
+              <div class="sem-badges-left">
+                ${catBadge}
+                ${modeBadge}
+                ${statusBadge}
+              </div>
+              <span class="sem-pill-xp">
+                <svg class="svg-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                +${sem.points_attend} XP
+              </span>
             </div>
-            <span class="sem-pill-xp">
-              <svg class="svg-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
-              +${sem.points_attend} XP
-            </span>
+
+            <h3 class="sem-card-title">${escapeHtml(sem.title)}</h3>
+
+            <div class="sem-meta-list">
+              <div class="sem-meta-item">
+                <svg class="svg-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                <span><strong>Narasumber:</strong> ${escapeHtml(sem.speaker || '-')}</span>
+              </div>
+              <div class="sem-meta-item">
+                <svg class="svg-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                <span><strong>Waktu:</strong> ${escapeHtml(sem.date_formatted || '')}</span>
+              </div>
+              ${locationMeta}
+            </div>
+
+            ${sem.description ? `<p class="sem-card-desc">${escapeHtml(sem.description)}</p>` : ''}
           </div>
 
-          <h3 class="sem-card-title">${escapeHtml(sem.title)}</h3>
-
-          <div class="sem-meta-list">
-            <div class="sem-meta-item">
-              <svg class="svg-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-              <span><strong>Narasumber:</strong> ${escapeHtml(sem.speaker || '-')}</span>
-            </div>
-            <div class="sem-meta-item">
-              <svg class="svg-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-              <span><strong>Waktu:</strong> ${escapeHtml(sem.date_formatted || '')}</span>
-            </div>
-            ${locationMeta}
+          <div class="sem-card-footer">
+            ${zoomAreaHtml}
+            ${actionBtnHtml}
           </div>
-
-          <p class="sem-card-desc">
-            ${escapeHtml(sem.description || 'Tidak ada deskripsi tambahan untuk kegiatan ini.')}
-          </p>
-        </div>
-
-        <div class="sem-card-footer">
-          ${zoomAreaHtml}
-          ${actionBtnHtml}
         </div>
       </div>
     `;

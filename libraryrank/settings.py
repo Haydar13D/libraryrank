@@ -11,9 +11,23 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 env = environ.Env(DEBUG=(bool, False))
 environ.Env.read_env(BASE_DIR / '.env')
 
+DEBUG = env.bool('DEBUG', default=True)
 SECRET_KEY   = env('SECRET_KEY', default='django-insecure-change-me')
-DEBUG        = env('DEBUG', default=True)
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1', '*'])
+ALLOWED_HOSTS = ['*']
+
+CSRF_TRUSTED_ORIGINS = [
+    'https://libraryrank.ums.ac.id:8002',
+    'http://libraryrank.ums.ac.id:8002',
+    'https://libraryrank.ums.ac.id',
+    'http://libraryrank.ums.ac.id',
+    'http://localhost:8002',
+    'http://127.0.0.1:8002',
+    'http://localhost:8000',
+    'http://127.0.0.1:8000',
+    'https://auth.ums.ac.id',
+    'https://*.ums.ac.id',
+    'http://*.ums.ac.id',
+]
 
 INSTALLED_APPS = [
     'unfold',
@@ -118,37 +132,62 @@ DATABASES = {
 DATABASE_ROUTERS = ['libraryrank.db_routers.KohaReadOnlyRouter']
 
 # ─────────────────────────────────────────────────────────────
-# CAS SSO
+# CAS SSO (UMS)
 # ─────────────────────────────────────────────────────────────
-AUTHENTICATION_BACKENDS = [
-    'django.contrib.auth.backends.ModelBackend',
-    'django_cas_ng.backends.CASBackend',
-]
+CAS_HOST                   = env('CAS_HOST', default='auth.ums.ac.id')
+CAS_PORT                   = env.int('CAS_PORT', default=443)
+CAS_CONTEXT                = env('CAS_CONTEXT', default='/cas')
+cas_ver_raw = str(env('CAS_VERSION', default='2')).strip()
+if cas_ver_raw.startswith('2'):
+    CAS_VERSION = '2'
+elif cas_ver_raw.startswith('3'):
+    CAS_VERSION = '3'
+else:
+    CAS_VERSION = cas_ver_raw
 
-CAS_SERVER_URL           = env('CAS_SERVER_URL', default='https://sso.university.ac.id/cas/')
-CAS_VERSION              = env('CAS_VERSION',    default='3')
-CAS_CREATE_USER          = True
+CAS_DISABLE_SSL_VALIDATION = env.bool('CAS_DISABLE_SSL_VALIDATION', default=True)
+
+if CAS_PORT == 443:
+    CAS_SERVER_URL = f"https://{CAS_HOST}{CAS_CONTEXT}/"
+else:
+    CAS_SERVER_URL = f"https://{CAS_HOST}:{CAS_PORT}{CAS_CONTEXT}/"
+
+CAS_VERIFY_SSL_CERTIFICATE   = not CAS_DISABLE_SSL_VALIDATION
+CAS_CREATE_USER              = True
 CAS_APPLY_ATTRIBUTES_TO_USER = True
-CAS_RENAME_ATTRIBUTES    = {
+CAS_RENAME_ATTRIBUTES        = {
     'cn':   'first_name',
     'sn':   'last_name',
     'mail': 'email',
 }
-CAS_LOCAL_DEV = env.bool('CAS_LOCAL_DEV', default=False)
+CAS_LOCAL_DEV       = env.bool('CAS_LOCAL_DEV', default=False)
+CAS_ADMIN_REDIRECT  = False
+CAS_RENEW           = env.bool('CAS_RENEW', default=True)
+CAS_LOGOUT_COMPLETELY = True
+CAS_LOGOUT_NEXT_PAGE = '/admin/login/'
+
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',
+    'leaderboard.cas_backend.LibrarianCASBackend',
+]
 
 LOGIN_URL           = 'cas_ng_login'
 LOGOUT_URL          = 'cas_ng_logout'
-LOGIN_REDIRECT_URL  = '/'
-LOGOUT_REDIRECT_URL = '/'
+LOGIN_REDIRECT_URL  = '/admin/'
+LOGOUT_REDIRECT_URL = '/admin/login/'
+
+# Nonaktifkan header COOP agar tidak memunculkan warning di console browser saat berjalan via HTTP (non-HTTPS)
+SECURE_CROSS_ORIGIN_OPENER_POLICY = None
 
 # ─────────────────────────────────────────────────────────────
 # KOHA SYNC — patron category → role mapping
 # Adjust to match your university's Koha categorycode values.
 # Run: python manage.py sync_from_koha
 # ─────────────────────────────────────────────────────────────
-KOHA_STUDENT_CATEGORIES  = env.list('KOHA_STUDENT_CATEGORIES',  default=['S', 'ST', 'STUDENT', 'MAHASISWA'])
-KOHA_LECTURER_CATEGORIES = env.list('KOHA_LECTURER_CATEGORIES', default=['L', 'LEC', 'DOSEN', 'FACULTY'])
-KOHA_STAFF_CATEGORIES    = env.list('KOHA_STAFF_CATEGORIES',    default=['STAFF', 'STF', 'KARYAWAN', 'PEGAWAI'])
+KOHA_STUDENT_CATEGORIES   = env.list('KOHA_STUDENT_CATEGORIES',   default=['S', 'ST', 'STUDENT', 'MAHASISWA', 'STD1', 'STD2'])
+KOHA_LECTURER_CATEGORIES  = env.list('KOHA_LECTURER_CATEGORIES',  default=['L', 'LEC', 'DOSEN', 'FACULTY', 'TC1', 'TC2', 'TC3'])
+KOHA_STAFF_CATEGORIES     = env.list('KOHA_STAFF_CATEGORIES',     default=['STAFF', 'STF', 'KARYAWAN', 'PEGAWAI', 'STAF1', 'STAF2', 'STAF3'])
+KOHA_LIBRARIAN_CATEGORIES = env.list('KOHA_LIBRARIAN_CATEGORIES', default=['LIBRARIAN'])
 
 # Koha branchcode → faculty display name
 KOHA_BRANCH_FACULTY_MAP = {
@@ -266,6 +305,11 @@ UNFOLD = {
                         "icon": "rule",
                         "link": reverse_lazy("admin:leaderboard_pointpolicy_changelist"),
                     },
+                    {
+                        "title": "Pengaturan Reset Poin",
+                        "icon": "restart_alt",
+                        "link": reverse_lazy("admin:leaderboard_leaderboardconfig_changelist"),
+                    },
                 ],
             },
             {
@@ -325,6 +369,16 @@ UNFOLD = {
                         "title": "Log Sistem (Error)",
                         "icon": "bug_report",
                         "link": reverse_lazy("admin:leaderboard_systemlog_changelist"),
+                    },
+                    {
+                        "title": "Pengguna Admin",
+                        "icon": "admin_panel_settings",
+                        "link": reverse_lazy("admin:auth_user_changelist"),
+                    },
+                    {
+                        "title": "Grup & Hak Akses",
+                        "icon": "group",
+                        "link": reverse_lazy("admin:auth_group_changelist"),
                     },
                 ],
             },

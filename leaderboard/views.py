@@ -347,10 +347,7 @@ from django.db import models
 
 def get_member_total_points(cardnumber):
     today = date.today()
-    if today.month <= 6:
-        first = today.replace(month=1, day=1)
-    else:
-        first = today.replace(month=7, day=1)
+    first = LeaderboardConfig.get_active_reset_date()
     
     if _use_demo():
         from .demo_data import _ALL

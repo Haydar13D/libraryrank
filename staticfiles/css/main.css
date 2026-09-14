@@ -1570,11 +1570,11 @@ h1, h2, h3, h4, h5, h6,
   background: var(--surface);
 }
 
-/* Seminar Cards Grid */
+/* Seminar Cards Grid - 2 Columns (Compact) */
 .sem-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
   margin-top: 20px;
 }
 
@@ -1584,8 +1584,9 @@ h1, h2, h3, h4, h5, h6,
   border-radius: var(--radius-lg);
   overflow: hidden;
   display: flex;
-  flex-direction: column;
-  justify-content: space-between;
+  flex-direction: row;
+  align-items: stretch;
+  min-height: 200px;
   transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
   position: relative;
 }
@@ -1604,14 +1605,21 @@ h1, h2, h3, h4, h5, h6,
   border-color: var(--green);
 }
 
-/* Card Poster */
+/* Card Poster (Left Side) */
 .sem-poster-wrap {
-  width: 100%;
-  height: 160px;
+  width: 170px;
+  min-width: 170px;
+  max-width: 170px;
+  height: auto;
   background: var(--surface2);
   position: relative;
   overflow: hidden;
-  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  border-bottom: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 .sem-poster-img {
@@ -1622,33 +1630,47 @@ h1, h2, h3, h4, h5, h6,
 }
 
 .sem-card:hover .sem-poster-img {
-  transform: scale(1.03);
+  transform: scale(1.04);
 }
 
 .sem-poster-placeholder {
   width: 100%;
   height: 100%;
+  min-height: 180px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
   background: var(--surface2);
   color: var(--muted);
+  padding: 12px;
+  text-align: center;
 }
 
 .sem-poster-placeholder span {
-  font-size: 0.76rem;
-  font-weight: 600;
+  font-size: 0.68rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
+  line-height: 1.25;
+}
+
+/* Card Content (Right Side) */
+.sem-card-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
 }
 
 .sem-card-body {
-  padding: 18px 18px 14px;
+  padding: 14px 16px 8px;
   flex: 1;
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
 .sem-badge-row {
@@ -1657,63 +1679,72 @@ h1, h2, h3, h4, h5, h6,
   justify-content: space-between;
   gap: 6px;
   flex-wrap: wrap;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .sem-badges-left {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   flex-wrap: wrap;
 }
 
 .sem-pill {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 3px 8px;
+  gap: 3px;
+  padding: 2px 6px;
   border-radius: var(--radius-xs);
-  font-size: 0.70rem;
+  font-size: 0.65rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.02em;
 }
 
 .sem-pill-xp {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 3px 8px;
+  gap: 3px;
+  padding: 2px 7px;
   border-radius: var(--radius-xs);
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 700;
   background: var(--gold-bg);
   color: var(--gold);
   border: 1px solid rgba(217, 119, 6, 0.2);
+  white-space: nowrap;
 }
 
 .sem-card-title {
-  font-size: 1.02rem;
+  font-size: 0.94rem;
   font-weight: 700;
   color: var(--text);
-  line-height: 1.38;
-  margin-bottom: 10px;
+  line-height: 1.35;
+  margin-bottom: 8px;
   font-family: var(--font-heading);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .sem-meta-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-bottom: 14px;
-  font-size: 0.79rem;
+  gap: 4px;
+  margin-bottom: 8px;
+  font-size: 0.76rem;
   color: var(--muted);
 }
 
 .sem-meta-item {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .sem-meta-item strong {
@@ -1726,20 +1757,24 @@ h1, h2, h3, h4, h5, h6,
 }
 
 .sem-card-desc {
-  font-size: 0.80rem;
+  font-size: 0.76rem;
   color: var(--muted);
-  line-height: 1.5;
-  margin-bottom: 14px;
-  flex: 1;
+  line-height: 1.4;
+  margin-bottom: 6px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .sem-card-footer {
-  padding: 12px 18px 18px;
+  padding: 10px 16px 14px;
   border-top: 1px solid var(--border-subtle);
   background: var(--surface);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .sem-btn-zoom {
@@ -1748,13 +1783,13 @@ h1, h2, h3, h4, h5, h6,
   justify-content: center;
   gap: 6px;
   width: 100%;
-  padding: 9px 12px;
+  padding: 7px 10px;
   border-radius: var(--radius-md);
   background: rgba(6, 182, 212, 0.1);
   border: 1px solid rgba(6, 182, 212, 0.25);
   color: #0891b2;
   text-decoration: none;
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   font-weight: 700;
   transition: all 0.15s ease;
 }
@@ -1973,6 +2008,29 @@ h1, h2, h3, h4, h5, h6,
   .sem-nim-bar {
     width: 100%;
     max-width: 100%;
+  }
+}
+
+@media (max-width: 580px) {
+  .sem-card {
+    flex-direction: column;
+  }
+  .sem-poster-wrap {
+    width: 100%;
+    min-width: 100%;
+    max-width: 100%;
+    height: 130px;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+  .sem-poster-placeholder {
+    min-height: 130px;
+  }
+  .sem-card-body {
+    padding: 12px 14px 6px;
+  }
+  .sem-card-footer {
+    padding: 8px 14px 12px;
   }
 }
 

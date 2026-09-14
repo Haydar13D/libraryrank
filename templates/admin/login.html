@@ -1,0 +1,104 @@
+{% extends 'unfold/layouts/unauthenticated.html' %}
+
+{% load i18n static unfold %}
+
+{% block extrastyle %}
+    {{ block.super }}
+    {{ form.media }}
+    <style>
+        .sso-card {
+            background: linear-gradient(135deg, rgba(28, 189, 179, 0.08) 0%, rgba(59, 130, 246, 0.08) 100%);
+            border: 1px solid rgba(28, 189, 179, 0.25);
+        }
+        .dark .sso-card {
+            background: linear-gradient(135deg, rgba(28, 189, 179, 0.12) 0%, rgba(59, 130, 246, 0.12) 100%);
+            border: 1px solid rgba(28, 189, 179, 0.35);
+        }
+    </style>
+{% endblock %}
+
+{% block title %}
+    Masuk Panel Admin | {{ site_title }}
+{% endblock %}
+
+{% block content %}
+    <div class="mb-6 text-center">
+        <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary-500/10 text-primary-600 dark:text-primary-400 mb-3 shadow-inner">
+            <span class="material-symbols-outlined text-3xl">local_library</span>
+        </div>
+        <h1 class="text-2xl font-black tracking-tight text-base-900 dark:text-base-100">
+            LibraryRank Admin
+        </h1>
+        <p class="text-xs text-base-500 dark:text-base-400 mt-1">
+            Sistem Informasi Gamifikasi & Klasemen Perpustakaan
+        </p>
+    </div>
+
+    {% include "unfold/helpers/messages.html" %}
+
+    {% if form.errors or form.non_field_errors %}
+        <div class="flex flex-col gap-4 mb-6 *:mb-0">
+            {% include "unfold/helpers/messages/errornote.html" with errors=form.errors %}
+            {% include "unfold/helpers/messages/error.html" with errors=form.non_field_errors %}
+
+            {% if user.is_authenticated %}
+                {% blocktranslate trimmed asvar message %}
+                    Anda terautentikasi sebagai {{ username }}, namun tidak memiliki izin mengakses halaman Admin.
+                {% endblocktranslate %}
+                {% include "unfold/helpers/messages/error.html" with error=message %}
+            {% endif %}
+        </div>
+    {% endif %}
+
+    <!-- SSO CAS UMS LOGIN SECTION (PRIMARY) -->
+    <div class="sso-card rounded-2xl p-5 mb-6 text-center shadow-sm">
+        <div class="flex items-center justify-center gap-1.5 mb-2">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span class="text-xs font-bold uppercase tracking-wider text-primary-700 dark:text-primary-300">
+                Single Sign-On (UMS)
+            </span>
+        </div>
+        
+        <p class="text-xs text-base-600 dark:text-base-300 mb-4">
+            Akses resmi staf & pustakawan Perpustakaan UMS menggunakan akun CAS universitas.
+        </p>
+
+        <a href="{% url 'cas_ng_login' %}?next={{ next|default:'/admin/' }}" 
+           class="w-full flex items-center justify-center gap-2.5 bg-primary-600 hover:bg-primary-700 active:scale-[0.99] text-white font-bold py-3 px-4 rounded-xl shadow transition duration-150 group">
+            <svg class="w-5 h-5 text-white/90 group-hover:rotate-12 transition duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+            </svg>
+            <span>Masuk dengan SSO UMS</span>
+            <span class="material-symbols-outlined text-sm relative right-0 group-hover:-right-1 transition-all">arrow_forward</span>
+        </a>
+
+        <div class="mt-3 flex items-center justify-center gap-1 text-[11px] text-base-400 dark:text-base-500">
+            <span class="material-symbols-outlined text-xs">verified_user</span>
+            <span>Khusus Pustakawan & Staf Perpustakaan</span>
+        </div>
+    </div>
+
+    <!-- DIVIDER -->
+    <div class="relative flex py-2 items-center mb-6">
+        <div class="flex-grow border-t border-base-200 dark:border-base-800"></div>
+        <span class="flex-shrink mx-3 text-xs font-medium text-base-400 dark:text-base-500 uppercase tracking-wider">
+            atau login akun lokal
+        </span>
+        <div class="flex-grow border-t border-base-200 dark:border-base-800"></div>
+    </div>
+
+    <!-- LOCAL LOGIN FORM (FALLBACK) -->
+    <form action="{{ app_path }}" method="post" id="login-form">
+        {% csrf_token %}
+
+        {% include "unfold/helpers/field.html" with field=form.username %}
+
+        {% include "unfold/helpers/field.html" with field=form.password %}
+
+        <div class="flex flex-col gap-3 mt-6">
+            {% component "unfold/components/button.html" with submit=1 variant="secondary" class="submit-row w-full font-semibold" %}
+                {% translate 'Log in dengan Akun Lokal' %}
+            {% endcomponent %}
+        </div>
+    </form>
+{% endblock %}

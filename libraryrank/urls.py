@@ -5,13 +5,20 @@ from django.conf.urls.static import static
 from django.contrib.auth import views as auth_views
 import django_cas_ng.views as cas_views
 
+from leaderboard.cas_views import CASLogoutView
+
+from django.views.static import serve
+from django.urls import re_path
+
 urlpatterns = [
+    # ── Override Admin Logout for CAS Single Sign-Out (Supports GET & POST) ──
+    path('admin/logout/',      CASLogoutView.as_view(),        name='admin_logout'),
     path('admin/', admin.site.urls),
 
     # ── CAS SSO ──
     # Note: django-cas-ng does NOT have a urls module — routes are added manually
     path('accounts/login/',    cas_views.LoginView.as_view(),  name='cas_ng_login'),
-    path('accounts/logout/',   cas_views.LogoutView.as_view(), name='cas_ng_logout'),
+    path('accounts/logout/',   CASLogoutView.as_view(),        name='cas_ng_logout'),
     path('accounts/callback/', cas_views.CallbackView.as_view(), name='cas_ng_callback'),
 
     # ── Local dev login (only used when CAS_LOCAL_DEV=True) ──
@@ -24,4 +31,7 @@ urlpatterns = [
 
     # ── App ──
     path('', include('leaderboard.urls')),
-] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+    # ── Media files ──
+    re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
+]

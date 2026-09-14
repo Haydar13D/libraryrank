@@ -14,9 +14,29 @@ from .models import Member, Faculty, LevelTier, BadgeRule, PointPolicy, SystemLo
 # The entire architecture has shifted to Live Koha Read-Only via koha_utils.py
 # Therefore, registering them will show zero local data and cause confusion.
 
+from datetime import date
+from django.core.cache import cache
+
 @admin.register(LeaderboardConfig)
 class LeaderboardConfigAdmin(ModelAdmin):
     list_display = ['reset_mode', 'get_active_reset_date']
+    change_form_before_template = 'leaderboard/admin/leaderboard_config_banner.html'
+    
+    conditional_fields = {
+        'yearly_reset_month': 'reset_mode === "auto_yearly"',
+        'manual_reset_date': 'reset_mode === "manual"',
+    }
+
+    fieldsets = (
+        ('Pengaturan Siklus Musim / Reset Poin', {
+            'fields': (
+                'reset_mode',
+                'yearly_reset_month',
+                'manual_reset_date',
+            ),
+            'description': 'Pilih sistem reset yang Anda inginkan. Jika memilih Otomatis Semester, sistem akan bekerja mandiri tanpa perlu disetel ulang.'
+        }),
+    )
     
     def has_add_permission(self, request):
         return not LeaderboardConfig.objects.exists()
@@ -24,6 +44,58 @@ class LeaderboardConfigAdmin(ModelAdmin):
     @display(description='Tanggal Reset Aktif')
     def get_active_reset_date(self, obj):
         return LeaderboardConfig.get_active_reset_date()
+
+    def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
+        extra_context = extra_context or {}
+        active_date = LeaderboardConfig.get_active_reset_date()
+        try:
+            extra_context['active_reset_date_formatted'] = active_date.strftime('%d %B %Y')
+        except Exception:
+            extra_context['active_reset_date_formatted'] = str(active_date)
+        return super().changeform_view(request, object_id, form_url, extra_context=extra_context)
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path('quick-reset-today/', self.admin_site.admin_view(self.quick_reset_today_view), name='leaderboard_config_reset_today'),
+            path('quick-auto-semester/', self.admin_site.admin_view(self.quick_auto_semester_view), name='leaderboard_config_auto_semester'),
+        ]
+        return custom_urls + urls
+
+    def quick_reset_today_view(self, request):
+        config = LeaderboardConfig.objects.first()
+        if not config:
+            config = LeaderboardConfig.objects.create()
+        
+        today = date.today()
+        config.reset_mode = 'manual'
+        config.manual_reset_date = today
+        config.save()
+        
+        cache.clear()
+        self.message_user(
+            request, 
+            f"✅ Klasemen berhasil di-reset! Sistem XP sekarang dimulai dari 0 per hari ini ({today.strftime('%d %B %Y')}).", 
+            level=messages.SUCCESS
+        )
+        return redirect(f'admin:leaderboard_leaderboardconfig_change', config.id)
+
+    def quick_auto_semester_view(self, request):
+        config = LeaderboardConfig.objects.first()
+        if not config:
+            config = LeaderboardConfig.objects.create()
+        
+        config.reset_mode = 'auto_semester'
+        config.save()
+        
+        cache.clear()
+        active_date = LeaderboardConfig.get_active_reset_date()
+        self.message_user(
+            request, 
+            f"✅ Sistem reset dikembalikan ke 'Otomatis Tiap Semester'. Tanggal aktif saat ini: {active_date.strftime('%d %B %Y')}.", 
+            level=messages.SUCCESS
+        )
+        return redirect(f'admin:leaderboard_leaderboardconfig_change', config.id)
 
 @admin.register(LevelTier)
 class LevelTierAdmin(ModelAdmin):
@@ -308,28 +380,43 @@ class SeminarAdmin(ModelAdmin):
     readonly_fields = ('image_preview', 'cert_template_preview')
     fieldsets = (
         ('Informasi Acara & Kategori', {
-            'fields': ('title', 'category', 'event_mode', 'description', 'speaker', 'date', 'location', 'meeting_url'),
+            'fields': (
+                'title',
+                ('category', 'event_mode'),
+                'description',
+                ('speaker', 'date'),
+                ('location', 'meeting_url'),
+            ),
             'description': 'Pilih jenis kegiatan dan format pelaksanaan (Tatap Muka, Daring/Zoom, atau Hybrid). Jika Daring/Hybrid, pastikan menyertakan Link Virtual Meeting.'
         }),
-        ('Poster / Banner Acara', {'fields': ('image', 'image_preview'), 'description': 'Disarankan mengunggah gambar dengan rasio 16:9 (misal 1200x675px) atau 4:3 agar tampilan di TV Kiosk dan Portal optimal.'}),
+        ('Poster / Banner Acara', {
+            'fields': (
+                ('image', 'image_preview'),
+            ),
+            'description': 'Disarankan mengunggah gambar dengan rasio 16:9 (misal 1200x675px) atau 4:3 agar tampilan di TV Kiosk dan Portal optimal.'
+        }),
+        ('Waktu Pendaftaran & Poin XP', {
+            'fields': (
+                ('registration_open', 'registration_close'),
+                ('points_register', 'points_attend'),
+            ),
+        }),
+        ('Kode Klaim Kehadiran', {
+            'fields': (
+                ('claim_code', 'claim_code_active'),
+            ),
+        }),
         ('Pengaturan E-Sertifikat & Template', {
             'fields': (
                 'cert_template',
                 'cert_template_preview',
-                'cert_font_family',
-                'cert_name_pos_y',
-                'cert_name_font_size',
-                'cert_name_color',
-                'cert_show_nim',
-                'cert_nim_pos_y',
-                'cert_number_template',
-                'cert_number_pos_y',
+                ('cert_font_family', 'cert_name_font_size'),
+                ('cert_name_color', 'cert_name_pos_y'),
+                ('cert_show_nim', 'cert_nim_pos_y'),
+                ('cert_number_template', 'cert_number_pos_y'),
             ),
             'description': 'Unggah file gambar background sertifikat kosong (PNG/JPG, disarankan A4 Landscape). Teks nama peserta akan otomatis dicetak simetris di tengah horizontal sesuai koordinat vertikal (Y).'
         }),
-        ('Pendaftaran', {'fields': ('registration_open', 'registration_close')}),
-        ('Pengaturan Poin', {'fields': ('points_register', 'points_attend')}),
-        ('Kode Klaim Kehadiran', {'fields': ('claim_code', 'claim_code_active')}),
     )
 
     @display(description='Kategori', label=True)

@@ -281,8 +281,8 @@ class Command(BaseCommand):
     # pintu masuk perpustakaan (cardnumber di-scan = 1 kunjungan).
     # ─────────────────────────────────────────────────────
     def _sync_visits(self, member_map):
-        # Build a reverse lookup: cardnumber → Member
-        card_to_member = {m.member_id: m for m in member_map.values()}
+        # Build a reverse lookup: cardnumber → Member (normalized uppercase)
+        card_to_member = {str(m.member_id).strip().upper(): m for m in member_map.values() if m.member_id}
 
         # ── PRIMARY: Satellite visitorhistory ──────────────────────────────
         sat_created = sat_skipped = 0
@@ -302,7 +302,8 @@ class Command(BaseCommand):
             from datetime import time as time_cls
             with transaction.atomic():
                 for cardnumber, visittime, location in sat_rows:
-                    member = card_to_member.get(str(cardnumber).strip())
+                    card_clean = str(cardnumber).strip().upper()
+                    member = card_to_member.get(card_clean)
                     if not member:
                         sat_skipped += 1
                         continue

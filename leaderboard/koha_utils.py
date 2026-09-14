@@ -77,13 +77,23 @@ def _get_satellite_visits(date_from, date_to_plus_1):
         )
         with conn.cursor() as cursor:
             cursor.execute("""
-                SELECT cardnumber, COUNT(*) as visit_count
-                FROM visitorhistory
-                WHERE visittime >= %s AND visittime < %s
-                  AND cardnumber IS NOT NULL AND cardnumber != ''
+                SELECT cardnumber, SUM(total) as visit_count
+                FROM (
+                    SELECT cardnumber, COUNT(*) as total
+                    FROM visitorhistory
+                    WHERE visittime >= %s AND visittime < %s
+                      AND cardnumber IS NOT NULL AND cardnumber != ''
+                    GROUP BY cardnumber
+                    UNION ALL
+                    SELECT cardnumber, COUNT(*) as total
+                    FROM visitorcorner
+                    WHERE visittime >= %s AND visittime < %s
+                      AND cardnumber IS NOT NULL AND cardnumber != ''
+                    GROUP BY cardnumber
+                ) as gabungan
                 GROUP BY cardnumber
-            """, [date_from, date_to_plus_1])
-            result = {str(card).strip(): cnt for card, cnt in cursor.fetchall()}
+            """, [date_from, date_to_plus_1, date_from, date_to_plus_1])
+            result = {str(card).strip().upper(): cnt for card, cnt in cursor.fetchall()}
         conn.close()
         cache.set(cache_key, result, 300)  # cache 5 menit
         return result
@@ -262,7 +272,7 @@ def get_live_members(date_from, date_to, search_q=None):
 
         # Kunjungan fisik: Ambil dari Gate Scanner (visitorhistory) sebagai sumber utama
         # Fallback ke transaksi sirkulasi (distinct hari) jika tidak ada data gate scan
-        card_str = str(card).strip() if card else ''
+        card_str = str(card).strip().upper() if card else ''
         sat_v_cnt = satellite_visits.get(card_str, 0)
         v_cnt = sat_v_cnt if sat_v_cnt > 0 else v_cnt
 

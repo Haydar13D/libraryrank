@@ -245,11 +245,6 @@ UNFOLD = {
                         "icon": "account_balance",
                         "link": reverse_lazy("admin:leaderboard_faculty_changelist"),
                     },
-                    {
-                        "title": "Books (Buku)",
-                        "icon": "menu_book",
-                        "link": reverse_lazy("admin:leaderboard_book_changelist"),
-                    },
                 ],
             },
             {
@@ -278,12 +273,12 @@ UNFOLD = {
                 "separator": True,
                 "items": [
                     {
-                        "title": "Daftar Event / Seminar",
+                        "title": "Buat Event / Seminar",
                         "icon": "event",
                         "link": reverse_lazy("admin:leaderboard_seminar_changelist"),
                     },
                     {
-                        "title": "Pendaftaran Peserta",
+                        "title": "Daftar Peserta Seminar",
                         "icon": "how_to_reg",
                         "link": reverse_lazy("admin:leaderboard_seminarregistration_changelist"),
                         "badge": "leaderboard.badges.get_pending_registrations",

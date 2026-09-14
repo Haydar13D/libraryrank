@@ -3,285 +3,391 @@
 
 {% block content %}
 
+<!-- HERO SECTION (Linear / Precision Matte) -->
 <div class="hero">
-  <h1>UMSLibrary<br><span>Leaderboard</span></h1>
-  <p>Merayakan pembaca, pengunjung &amp; teraktif serta prestasi akademik di seluruh fakultas.</p>
-
-  <div style="margin-top: 36px; max-width: 540px; margin-left: auto; margin-right: auto; text-align: left;">
-    <h3
-      style="font-size: 1.05rem; color: var(--text); margin-bottom: 12px; display: flex; align-items: center; justify-content: center; gap: 6px;">
-      <span class="material-icons-outlined" style="color: var(--gold);">redeem</span>
-      Cari poinmu berapa & dapatkan hadiahnya!
-    </h3>
-    <div class="search-wrap" style="width: 100%;">
-      <span class="search-icon"><span class="material-icons-outlined">search</span></span>
-      <input type="text" id="searchInput" placeholder="🔍 Cari NIM atau Nama Anda disini..." value="{{ search_q }}">
+  <div style="max-width: 680px; margin: 0 auto;">
+    <div
+      style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-xs); font-size: 0.75rem; font-weight: 700; color: var(--gold); margin-bottom: 14px;">
+      <svg class="svg-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path>
+        <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path>
+        <path d="M4 22h16"></path>
+        <path
+          d="M10 14.66V17c0 .55-.45 1-1 1H7c-.55 0-1 .45-1 1v1c0 .55.45 1 1 1h10c.55 0 1-.45 1-1v-1c0-.55-.45-1-1-1h-2c-.55 0-1-.45-1-1v-2.34">
+        </path>
+        <path d="M18 4H6v7a6 6 0 0 0 12 0V4z"></path>
+      </svg>
+      UPT PERPUSTAKAAN UMS
     </div>
 
-    <!-- Quick Search Result -->
-    <div id="searchResultQuick"
-      style="display: none; margin-top: 14px; background: var(--surface); border: 2px solid var(--primary); box-shadow: 0 4px 12px rgba(129, 140, 248, 0.15); border-radius: 12px; padding: 12px 16px; align-items: center; justify-content: space-between; text-align: left; transition: transform 0.2s;">
-      <div style="display: flex; align-items: center; gap: 12px;">
-        <div id="quickAvatar"
-          style="width:44px; height:44px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size: 1.1rem; flex-shrink: 0;">
-        </div>
-        <div style="overflow: hidden;">
-          <div id="quickName"
-            style="font-weight: 700; color: var(--text); font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+    <h1>UMSLibrary <span>Leaderboard</span></h1>
+    <p>Apresiasi keaktifan literasi, kunjungan fisik, dan presensi ilmiah civitas akademika Universitas Muhammadiyah
+      Surakarta.</p>
+
+    <!-- Search Section -->
+    <div class="hero-search-wrap">
+      <span class="hero-search-icon" id="heroSearchIcon">
+        <svg class="svg-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+      </span>
+      <input type="text" id="searchInput" class="hero-search-input"
+        placeholder="Cari berdasarkan NIM, NIDN, atau Nama..." value="{{ search_q }}">
+
+      <!-- Quick Search Result Dropdown -->
+      <div id="searchResultQuick" class="search-result-quick">
+        <div class="quick-left">
+          <div id="quickAvatar" class="quick-avatar"></div>
+          <div>
+            <div id="quickName" class="quick-name"></div>
+            <div id="quickFaculty" class="quick-sub"></div>
           </div>
-          <div id="quickFaculty"
-            style="font-size: 0.8rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-          </div>
         </div>
-      </div>
-      <div style="text-align: right; flex-shrink: 0;">
-        <div id="quickXP" style="font-weight: 800; font-size: 1.2rem; color: var(--primary);"></div>
-        <div style="font-size: 0.7rem; font-weight: 700; color: var(--muted); text-transform: uppercase;">Total XP</div>
+        <div style="text-align: right;">
+          <div id="quickXP" class="quick-xp"></div>
+          <div style="font-size: 0.68rem; color: var(--muted); text-transform: uppercase;">Total XP</div>
+        </div>
       </div>
     </div>
-
   </div>
 </div>
 
-<div class="stats-bar" id="statsBar">
-  <div class="stat-chip"><span class="dot" style="background:var(--blue)"></span><strong
-      id="statVisitors">—</strong>&nbsp;Total Kedatangan</div>
-  <div class="stat-chip"><span class="dot" style="background:var(--green)"></span><strong
-      id="statBooks">—</strong>&nbsp;Books Borrowed</div>
-  <div class="stat-chip"><span class="dot" style="background:var(--purple)"></span><strong
-      id="statMembers">—</strong>&nbsp;Active Members</div>
-  <!-- <div class="stat-chip"><span class="dot" style="background:var(--orange)"></span><strong
-      id="statFaculties">—</strong>&nbsp;Faculties</div> -->
-</div>
+<!-- MERCHANDISE REWARD SHOP -->
+<div class="merch-section-wrap">
+  <div class="merch-section">
+    <div class="section-header">
+      <div>
+        <div class="section-title">
+          <svg class="svg-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 12 20 22 4 22 4 12"></polyline>
+            <rect x="2" y="7" width="20" height="5"></rect>
+            <line x1="12" y1="22" x2="12" y2="7"></line>
+            <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"></path>
+            <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"></path>
+          </svg>
+          Katalog Penukaran Merchandise (Reward Shop)
+        </div>
+        <div class="section-subtitle">Tukarkan XP Anda dengan merchandise resmi UMS Library melalui verifikasi OTP email kampus.</div>
+      </div>
+    </div>
 
-<!-- MERCHANDISE CAROUSEL -->
-<div class="merch-carousel-wrapper"
-  style="overflow: hidden; width: 100%; max-width: 1200px; margin: 16px auto; background: var(--surface); border-radius: var(--radius); padding: 16px 0 12px; border: 1px solid var(--border); position: relative;">
-  <div style="display:flex; align-items:center; justify-content:space-between; padding: 0 20px 8px;">
-    <div class="section-title" style="margin: 0; font-size: 1rem;"><span class="material-icons-outlined">redeem</span>
-      Merchandise Reward</div>
-    <span
-      style="font-size:0.72rem; color:var(--muted); font-style:italic; display:flex; align-items:center; gap:4px;"><span
-        class="material-icons-outlined" style="font-size:0.85rem;">info</span> Gambar bisa berbeda dengan produk
-      aslinya</span>
-  </div>
-
-  <div style="position:relative; overflow:hidden;">
-    <div id="merchTrack" style="display:flex; gap:12px; padding:0 20px; transition: transform 0.35s ease;">
-
+    <div class="merch-slider">
       {% for reward in rewards %}
       <div class="merch-slide" data-id="{{ reward.id }}" data-name="{{ reward.name }}"
-        data-cost="{{ reward.points_cost }}" data-stock="{{ reward.stock }}"
-        style="flex-shrink:0; width:168px; background:var(--surface2); border-radius:var(--radius); padding:10px; border:1px solid var(--border); display:flex; flex-direction:column; align-items:center; cursor:pointer; transition:border-color 0.15s;">
-        {% if reward.image_url %}
-        <img src="{{ reward.image_url }}" alt="{{ reward.name }}"
-          style="width:100%; height:120px; object-fit:cover; border-radius:8px; margin-bottom:8px;">
-        {% else %}
-        <img src="{% static 'img/merch/' %}{{ forloop.counter|default:1 }}.png" alt="{{ reward.name }}"
-          style="width:100%; height:120px; object-fit:cover; border-radius:8px; margin-bottom:8px;"
-          onerror="this.src='https://placehold.co/168x120/e2e8f0/64748b?text={{ reward.name|urlencode }}';">
-        {% endif %}
-        <h4
-          style="font-size:0.82rem; margin:0 0 4px; text-align:center; color:var(--text); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:100%;">
-          {{ reward.name }}</h4>
-        <span
-          style="color:var(--muted); font-size:0.75rem; font-weight:600; display:flex; align-items:center; gap:3px;"><span
-            class="material-icons-outlined" style="font-size:0.85rem;">stars</span> {{ reward.points_cost }} XP</span>
-        <span style="color:var(--muted); font-size:0.68rem; margin-top:2px;">Stok: {{ reward.stock }}</span>
+        data-cost="{{ reward.points_cost }}" data-stock="{{ reward.stock }}">
+        <div class="merch-img-wrap">
+          {% if reward.image_url %}
+          <img src="{{ reward.image_url }}" alt="{{ reward.name }}">
+          {% else %}
+          <img src="{% static 'img/merch/' %}{{ forloop.counter|default:1 }}.png" alt="{{ reward.name }}"
+            onerror="this.src='https://placehold.co/168x120/1e2230/949cae?text={{ reward.name|urlencode }}';">
+          {% endif %}
+        </div>
+        <div class="merch-title">{{ reward.name }}</div>
+        <div class="merch-cost">
+          <svg class="svg-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon
+              points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2">
+            </polygon>
+          </svg>
+          {{ reward.points_cost }} XP
+        </div>
+        <div class="merch-stock">Tersedia: {{ reward.stock }} unit</div>
       </div>
       {% empty %}
-      <div style="color: var(--muted); padding: 20px; text-align: center; width: 100%;">Belum ada merchandise yang
-        tersedia.</div>
+      <div style="color: var(--muted); padding: 24px; text-align: center; grid-column: 1 / -1;">Belum ada merchandise yang tersedia untuk penukaran.</div>
       {% endfor %}
-
     </div>
-
-    <button id="merchPrev" onclick="scrollMerch(-1)"
-      style="position:absolute; left:4px; top:50%; transform:translateY(-50%); background:var(--surface); border:1px solid var(--border); border-radius:6px; width:28px; height:28px; color:var(--text); font-size:1rem; cursor:pointer; z-index:10; display:flex; align-items:center; justify-content:center;">‹</button>
-    <button id="merchNext" onclick="scrollMerch(1)"
-      style="position:absolute; right:4px; top:50%; transform:translateY(-50%); background:var(--surface); border:1px solid var(--border); border-radius:6px; width:28px; height:28px; color:var(--text); font-size:1rem; cursor:pointer; z-index:10; display:flex; align-items:center; justify-content:center;">›</button>
   </div>
 </div>
 
-<style>
-  .merch-slide:hover {
-    border-color: var(--surface3);
-  }
-</style>
+<!-- STATS BAR (Bento Grid) -->
+<div class="stats-bar-wrap">
+  <div class="stats-bar" id="statsBar">
+    <div class="stat-card">
+      <div class="stat-icon">
+        <svg class="svg-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="m13 4 2 2 3-1"></path>
+          <circle cx="13" cy="4" r="1.5"></circle>
+          <path d="M10 20v-5l-2-3 4-4 3 2 3 6"></path>
+          <path d="m6 17 3-3"></path>
+        </svg>
+      </div>
+      <div class="stat-info">
+        <div class="stat-num" id="statVisitors">—</div>
+        <div class="stat-label">Total Kedatangan</div>
+      </div>
+    </div>
 
-<script>
-  (function () {
-    const track = document.getElementById('merchTrack');
-    const slides = track.querySelectorAll('.merch-slide');
-    const slideW = 168 + 12;
-    let current = 0;
-    const visible = () => Math.floor(track.parentElement.offsetWidth / slideW);
-    const maxIdx = () => Math.max(0, slides.length - visible());
+    <div class="stat-card">
+      <div class="stat-icon">
+        <svg class="svg-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+        </svg>
+      </div>
+      <div class="stat-info">
+        <div class="stat-num" id="statBooks">—</div>
+        <div class="stat-label">Buku Dipinjam</div>
+      </div>
+    </div>
 
-    window.scrollMerch = function (dir) {
-      current = Math.max(0, Math.min(current + dir, maxIdx()));
-      track.style.transform = `translateX(-${current * slideW}px)`;
-    };
-
-    setInterval(() => {
-      current = current >= maxIdx() ? 0 : current + 1;
-      track.style.transform = `translateX(-${current * slideW}px)`;
-    }, 4000);
-  })();
-</script>
-
-
-<!-- CONTROLS -->
-<div class="controls" style="justify-content: flex-end;">
-  <!-- Search input moved to hero -->
-  <input type="date" class="date-input" id="dateFrom" value="{{ date_from }}">
-  <span class="date-sep">to</span>
-  <input type="date" class="date-input" id="dateTo" value="{{ date_to }}">
-  <button class="btn-exp g" id="btnExcelExport"><span class="material-icons-outlined">analytics</span> Excel</button>
-  <button class="btn-exp r" id="btnPdfExport"><span class="material-icons-outlined">description</span> PDF</button>
+    <div class="stat-card">
+      <div class="stat-icon">
+        <svg class="svg-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+          <circle cx="12" cy="7" r="4"></circle>
+        </svg>
+      </div>
+      <div class="stat-info">
+        <div class="stat-num" id="statMembers">—</div>
+        <div class="stat-label">Anggota Aktif</div>
+      </div>
+    </div>
+  </div>
 </div>
 
-<!-- TABS -->
+<!-- CONTROLS TOOLBAR -->
+<div class="controls-bar">
+  <div class="date-controls">
+    <div class="date-input-wrap">
+      <span>Dari:</span>
+      <input type="date" id="dateFrom" value="{{ date_from }}">
+    </div>
+    <div class="date-input-wrap">
+      <span>Sampai:</span>
+      <input type="date" id="dateTo" value="{{ date_to }}">
+    </div>
+  </div>
+
+  <div style="display: flex; align-items: center; gap: 8px;">
+    <button class="btn-exp g" id="btnExcelExport">
+      <svg class="svg-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="18" y1="20" x2="18" y2="10"></line>
+        <line x1="12" y1="20" x2="12" y2="4"></line>
+        <line x1="6" y1="20" x2="6" y2="14"></line>
+      </svg> Excel
+    </button>
+    <button class="btn-exp r" id="btnPdfExport">
+      <svg class="svg-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+        <polyline points="14 2 14 8 20 8"></polyline>
+        <line x1="16" y1="13" x2="8" y2="13"></line>
+        <line x1="16" y1="17" x2="8" y2="17"></line>
+      </svg> PDF
+    </button>
+  </div>
+</div>
+
+<!-- SEGMENTED TABS -->
 <div class="tab-nav">
-  <button class="tab-btn active" data-tab="overview"><span class="material-icons-outlined">emoji_events</span>
-    Overview</button>
-  <button class="tab-btn" data-tab="students"><span class="material-icons-outlined">school</span> Students</button>
-  <button class="tab-btn" data-tab="lecturers"><span class="material-icons-outlined">person</span> Lecturers</button>
-  <button class="tab-btn" data-tab="staff"><span class="material-icons-outlined">work</span> Staff</button>
-  <!-- <button class="tab-btn" data-tab="books"><span class="material-icons-outlined">menu_book</span> Books &amp;
-    Borrowers</button>
-  <button class="tab-btn" data-tab="faculties"><span class="material-icons-outlined">account_balance</span>
-    Faculties</button> -->
+  <button class="tab-btn active" data-tab="overview">Overview</button>
+  <button class="tab-btn" data-tab="students">Mahasiswa</button>
+  <button class="tab-btn" data-tab="lecturers">Dosen</button>
+  <button class="tab-btn" data-tab="staff">Tendik / Staff</button>
+  <button class="tab-btn" data-tab="books">Buku Terpopuler</button>
 </div>
 
 <!-- MAIN CONTENT PANELS -->
 <div class="main">
 
-  <!-- OVERVIEW -->
+  <!-- OVERVIEW PANEL -->
   <div id="panel-overview" class="panel active">
-    <div class="nomination-grid" id="nominations">
-      <div class="nom-skeleton nom-card students"></div>
-      <div class="nom-skeleton nom-card lecturers"></div>
-      <div class="nom-skeleton nom-card staff"></div>
-    </div>
-    <div class="card-block" style="margin-bottom: 32px; padding: 20px;">
-      <h3 style="margin-bottom:14px; display:flex; align-items:center; gap:6px;"><span class="material-icons-outlined"
-          style="color:var(--muted);">analytics</span> Analitik Kunjungan</h3>
-      <div style="width:100%; height:280px; position:relative;">
+    <!-- Top 3 Nominations Bento Grid -->
+    <div class="nominations-grid" id="nominations"></div>
+
+    <!-- Chart Block -->
+    <div class="section-card">
+      <div class="section-header">
+        <div class="section-title">
+          <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="20" x2="18" y2="10"></line>
+            <line x1="12" y1="20" x2="12" y2="4"></line>
+            <line x1="6" y1="20" x2="6" y2="14"></line>
+          </svg>
+          Grafik Kunjungan Harian
+        </div>
+        <div class="section-subtitle">Aktivitas Gate Masuk Periode Aktif</div>
+      </div>
+      <div style="width: 100%; height: 240px; position: relative;">
         <canvas id="overviewChart"></canvas>
       </div>
     </div>
 
-    <div class="section-title"><span class="material-icons-outlined">emoji_events</span> Top Poin (XP) Bulan Ini</div>
-    <div class="leaderboard-list" id="overviewList">
-      {% for i in "0123456" %}<div class="lb-skeleton"></div>{% endfor %}
+    <!-- Podium & Leaderboard Block -->
+    <div class="section-card">
+      <div class="section-header" style="justify-content: center; text-align: center;">
+        <div>
+          <div class="section-title" style="justify-content: center;">
+            <svg class="svg-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--gold)"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path>
+              <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path>
+              <path d="M4 22h16"></path>
+              <path
+                d="M10 14.66V17c0 .55-.45 1-1 1H7c-.55 0-1 .45-1 1v1c0 .55.45 1 1 1h10c.55 0 1-.45 1-1v-1c0-.55-.45-1-1-1h-2c-.55 0-1-.45-1-1v-2.34">
+              </path>
+              <path d="M18 4H6v7a6 6 0 0 0 12 0V4z"></path>
+            </svg>
+            Top Peringkat XP Keseluruhan
+          </div>
+          <div class="section-subtitle" style="margin-top: 2px;">Akumulasi poin gate scan, sirkulasi koha, dan event
+            literasi</div>
+        </div>
+      </div>
+
+      <!-- Engineered Podium -->
+      <div id="podium-overview" class="podium-wrap"></div>
+
+      <!-- Tabular List -->
+      <div class="leaderboard-list-header">
+        <div>Rank</div>
+        <div>Pemustaka</div>
+        <div>Fakultas / Prodi</div>
+        <div style="text-align: right;">Total XP</div>
+      </div>
+      <div class="leaderboard-list" id="overviewList"></div>
     </div>
   </div>
 
-  <!-- STUDENTS -->
+  <!-- STUDENTS PANEL -->
   <div id="panel-students" class="panel">
-    <div class="section-title"><span class="material-icons-outlined">school</span> Student Rankings</div>
-    <div class="two-col">
-      <div class="card-block">
-        <h3><span class="material-icons-outlined">rocket_launch</span> Top XP Leaderboard</h3>
-        <div class="leaderboard-list" id="list-student-xp"></div>
+    <div class="section-card">
+      <div class="section-header" style="justify-content: center; text-align: center;">
+        <div class="section-title" style="justify-content: center;">
+          <svg class="svg-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 10v6M2 10l10-5 10 5-10 5z"></path>
+            <path d="M6 12v5c3 3 9 3 12 0v-5"></path>
+          </svg>
+          Top Peringkat Mahasiswa
+        </div>
       </div>
-      <div class="card-block">
-        <h3><span class="material-icons-outlined">directions_walk</span> Top Pengunjung</h3>
+      <div id="podium-student-xp" class="podium-wrap"></div>
+      <div class="leaderboard-list-header">
+        <div>Rank</div>
+        <div>Nama Mahasiswa</div>
+        <div>Fakultas / Prodi</div>
+        <div style="text-align: right;">Total XP</div>
+      </div>
+      <div class="leaderboard-list" id="list-student-xp"></div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px;">
+      <div class="section-card">
+        <div class="section-title" style="margin-bottom: 12px;">Top Kunjungan Fisik</div>
         <div class="leaderboard-list" id="list-student-visitors"></div>
       </div>
-      <div class="card-block">
-        <h3><span class="material-icons-outlined">library_books</span> Top Borrowers</h3>
+      <div class="section-card">
+        <div class="section-title" style="margin-bottom: 12px;">Top Peminjam Buku</div>
         <div class="leaderboard-list" id="list-student-borrowers"></div>
       </div>
-      <div class="card-block">
-        <h3><span class="material-icons-outlined">local_activity</span> Top Peserta Seminar</h3>
+      <div class="section-card">
+        <div class="section-title" style="margin-bottom: 12px;">Top Peserta Seminar</div>
         <div class="leaderboard-list" id="list-student-seminar"></div>
       </div>
     </div>
   </div>
 
-  <!-- LECTURERS -->
+  <!-- LECTURERS PANEL -->
   <div id="panel-lecturers" class="panel">
-    <div class="section-title"><span class="material-icons-outlined">person</span> Lecturer Rankings</div>
-    <div class="two-col">
-      <div class="card-block">
-        <h3><span class="material-icons-outlined">rocket_launch</span> Top XP Leaderboard</h3>
-        <div class="leaderboard-list" id="list-lecturer-xp"></div>
+    <div class="section-card">
+      <div class="section-header" style="justify-content: center; text-align: center;">
+        <div class="section-title" style="justify-content: center;">
+          <svg class="svg-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+            <circle cx="12" cy="7" r="4"></circle>
+          </svg>
+          Top Peringkat Dosen
+        </div>
       </div>
-      <div class="card-block">
-        <h3><span class="material-icons-outlined">directions_walk</span> Top Pengunjung</h3>
+      <div id="podium-lecturer-xp" class="podium-wrap"></div>
+      <div class="leaderboard-list-header">
+        <div>Rank</div>
+        <div>Nama Dosen</div>
+        <div>Fakultas</div>
+        <div style="text-align: right;">Total XP</div>
+      </div>
+      <div class="leaderboard-list" id="list-lecturer-xp"></div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px;">
+      <div class="section-card">
+        <div class="section-title" style="margin-bottom: 12px;">Top Kunjungan Dosen</div>
         <div class="leaderboard-list" id="list-lecturer-visitors"></div>
       </div>
-      <div class="card-block">
-        <h3><span class="material-icons-outlined">library_books</span> Top Borrowers</h3>
+      <div class="section-card">
+        <div class="section-title" style="margin-bottom: 12px;">Top Peminjam Buku Dosen</div>
         <div class="leaderboard-list" id="list-lecturer-borrowers"></div>
       </div>
-      <div class="card-block">
-        <h3><span class="material-icons-outlined">local_activity</span> Top Peserta Seminar</h3>
+      <div class="section-card">
+        <div class="section-title" style="margin-bottom: 12px;">Top Peserta Seminar Dosen</div>
         <div class="leaderboard-list" id="list-lecturer-seminar"></div>
       </div>
     </div>
   </div>
 
-  <!-- STAFF -->
+  <!-- STAFF PANEL -->
   <div id="panel-staff" class="panel">
-    <div class="section-title"><span class="material-icons-outlined">work</span> Staff Rankings</div>
-    <div class="two-col">
-      <div class="card-block">
-        <h3><span class="material-icons-outlined">rocket_launch</span> Top XP Leaderboard</h3>
-        <div class="leaderboard-list" id="list-staff-xp"></div>
+    <div class="section-card">
+      <div class="section-header" style="justify-content: center; text-align: center;">
+        <div class="section-title" style="justify-content: center;">
+          <svg class="svg-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+            <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+          </svg>
+          Top Peringkat Tendik / Staff
+        </div>
       </div>
-      <div class="card-block">
-        <h3><span class="material-icons-outlined">directions_walk</span> Top Pengunjung</h3>
+      <div id="podium-staff-xp" class="podium-wrap"></div>
+      <div class="leaderboard-list-header">
+        <div>Rank</div>
+        <div>Nama Staff</div>
+        <div>Unit / Biro</div>
+        <div style="text-align: right;">Total XP</div>
+      </div>
+      <div class="leaderboard-list" id="list-staff-xp"></div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px;">
+      <div class="section-card">
+        <div class="section-title" style="margin-bottom: 12px;">Top Kunjungan Staff</div>
         <div class="leaderboard-list" id="list-staff-visitors"></div>
       </div>
-      <div class="card-block">
-        <h3><span class="material-icons-outlined">library_books</span> Top Borrowers</h3>
+      <div class="section-card">
+        <div class="section-title" style="margin-bottom: 12px;">Top Peminjam Buku Staff</div>
         <div class="leaderboard-list" id="list-staff-borrowers"></div>
       </div>
-      <div class="card-block">
-        <h3><span class="material-icons-outlined">local_activity</span> Top Peserta Seminar</h3>
+      <div class="section-card">
+        <div class="section-title" style="margin-bottom: 12px;">Top Peserta Seminar Staff</div>
         <div class="leaderboard-list" id="list-staff-seminar"></div>
       </div>
     </div>
   </div>
 
-  <!-- BOOKS -->
+  <!-- BOOKS PANEL -->
   <div id="panel-books" class="panel">
-    <div class="section-title"><span class="material-icons-outlined">menu_book</span> Books &amp; Top Borrowers</div>
-    <div class="two-col">
-      <div class="card-block">
-        <h3><span class="material-icons-outlined">library_books</span> Most Borrowed Books</h3>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px;">
+      <div class="section-card">
+        <div class="section-title" style="margin-bottom: 14px;">Buku Paling Banyak Dipinjam</div>
         <div id="booksList"></div>
       </div>
-      <div class="card-block">
-        <h3><span class="material-icons-outlined">workspace_premium</span> Top Book Borrowers</h3>
+      <div class="section-card">
+        <div class="section-title" style="margin-bottom: 14px;">Peminjam Buku Terbanyak</div>
         <div class="leaderboard-list" id="borrowerList"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- FACULTIES -->
-  <div id="panel-faculties" class="panel">
-    <div class="section-title"><span class="material-icons-outlined">account_balance</span> Faculty Activity Rankings
-    </div>
-    <div class="card-block" style="margin-bottom:20px">
-      <h3><span class="material-icons-outlined">analytics</span> Visitor Distribution by Faculty</h3>
-      <div id="facultyBars" style="display:flex;flex-direction:column;gap:12px;margin-top:10px"></div>
-    </div>
-    <div class="section-title"><span class="material-icons-outlined">library_books</span> Books &amp; Top Students by
-      Faculty</div>
-    <div class="two-col">
-      <div class="card-block">
-        <h3><span class="material-icons-outlined" style="color:var(--green);">bookmark</span> Books Borrowed per Faculty
-        </h3>
-        <div id="facultyBooks"></div>
-      </div>
-      <div class="card-block">
-        <h3><span class="material-icons-outlined" style="color:var(--purple);">person</span> Top Student per Faculty
-        </h3>
-        <div id="facultyTopStudents"></div>
       </div>
     </div>
   </div>

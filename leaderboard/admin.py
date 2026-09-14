@@ -3,10 +3,12 @@ from django.db import transaction
 from unfold.admin import ModelAdmin
 from unfold.decorators import display
 from django.utils.html import format_html
+from django.utils.safestring import mark_safe
+from django.template.loader import render_to_string
 from django.urls import path, reverse
 from django.shortcuts import redirect
 from django.utils import timezone
-from .models import Member, Faculty, Book, LevelTier, BadgeRule, PointPolicy, SystemLog, Reward, PointTransaction, RedemptionClaim, Seminar, SeminarRegistration, LeaderboardConfig
+from .models import Member, Faculty, LevelTier, BadgeRule, PointPolicy, SystemLog, Reward, PointTransaction, RedemptionClaim, Seminar, SeminarRegistration, LeaderboardConfig
 
 # Visit and BorrowRecord models are no longer managed by Django ORM!
 # The entire architecture has shifted to Live Koha Read-Only via koha_utils.py
@@ -134,24 +136,39 @@ from django.db import models
 from django.forms import Textarea
 @admin.register(SeminarUpload)
 class SeminarUploadAdmin(ModelAdmin):
-    list_display = ['title', 'points', 'input_method', 'processed', 'created_at']
-    list_filter = ['processed']
-    search_fields = ['title']
+    list_display = ['get_seminar_title', 'get_points_display', 'input_method', 'processed', 'created_at']
+    list_filter = ['processed', 'seminar']
+    search_fields = ['seminar__title', 'title']
     readonly_fields = ['processed']
+    fields = ['seminar', 'points', 'csv_file', 'manual_input', 'processed']
 
     formfield_overrides = {
         models.TextField: {'widget': Textarea(attrs={
             'placeholder': 'Contoh cara input data:\nL200230051\nL200230052\nL200230053\n\n* Ketik satu NIM per baris.\n* Tekan tombol ENTER untuk NIM selanjutnya.\n* NIM bisa menggunakan huruf besar atau kecil.',
-            'rows': 10
+            'rows': 8
         })},
     }
+
+    @display(description='Event / Seminar')
+    def get_seminar_title(self, obj):
+        if obj.seminar:
+            return obj.seminar.title
+        return obj.title or '-'
+
+    @display(description='Poin XP')
+    def get_points_display(self, obj):
+        if obj.points:
+            return f"{obj.points} XP"
+        policy = PointPolicy.objects.filter(action_type='seminar', is_active=True).first()
+        val = policy.points if policy else (obj.seminar.points_attend if obj.seminar else 15)
+        return f"{val} XP (Auto Kebijakan)"
 
     def input_method(self, obj):
         parts = []
         if obj.csv_file: parts.append("CSV File")
         if obj.manual_input: parts.append("Manual Textbox")
         return " + ".join(parts) if parts else "-"
-    input_method.short_description = "Input Method"
+    input_method.short_description = "Metode Input"
 
 
 @admin.register(SystemLog)
@@ -165,6 +182,7 @@ class SystemLogAdmin(ModelAdmin):
     def has_change_permission(self, request, obj=None):
         return False
 
+
 @admin.register(Faculty)
 class FacultyAdmin(ModelAdmin):
     list_display = ('code', 'name', 'color_badge')
@@ -175,6 +193,7 @@ class FacultyAdmin(ModelAdmin):
         if not obj.color: return '-'
         return format_html('<span style="background-color: {}; padding: 4px 8px; border-radius: 4px; color: #fff; font-weight: bold;">{}</span>', obj.color, obj.color)
 
+
 @admin.register(Member)
 class MemberAdmin(ModelAdmin):
     list_display = ('member_id', 'name', 'role', 'faculty_code', 'is_active', 'streak_days')
@@ -184,12 +203,6 @@ class MemberAdmin(ModelAdmin):
     def faculty_code(self, obj):
         return obj.faculty.code if obj.faculty else '-'
     faculty_code.short_description = 'Faculty'
-
-@admin.register(Book)
-class BookAdmin(ModelAdmin):
-    list_display = ('isbn', 'title', 'author', 'category', 'faculty')
-    list_filter = ('category', 'faculty')
-    search_fields = ('isbn', 'title', 'author')
 
 
 @admin.register(RedemptionClaim)
@@ -288,16 +301,84 @@ class RedemptionClaimAdmin(ModelAdmin):
 
 @admin.register(Seminar)
 class SeminarAdmin(ModelAdmin):
-    list_display = ('title', 'speaker', 'date', 'points_register', 'points_attend', 'claim_code', 'code_status')
-    list_filter = ('claim_code_active', 'date')
-    search_fields = ('title', 'speaker', 'claim_code')
+    list_display = ('title', 'category_badge', 'mode_badge', 'speaker', 'date', 'points_register', 'points_attend', 'claim_code', 'code_status', 'image_thumbnail', 'cert_status')
+    list_filter = ('category', 'event_mode', 'claim_code_active', 'date')
+    search_fields = ('title', 'speaker', 'claim_code', 'location')
     actions = ['activate_claim_code', 'deactivate_claim_code']
+    readonly_fields = ('image_preview', 'cert_template_preview')
     fieldsets = (
-        ('Informasi Umum', {'fields': ('title', 'description', 'speaker', 'date')}),
+        ('Informasi Acara & Kategori', {
+            'fields': ('title', 'category', 'event_mode', 'description', 'speaker', 'date', 'location', 'meeting_url'),
+            'description': 'Pilih jenis kegiatan dan format pelaksanaan (Tatap Muka, Daring/Zoom, atau Hybrid). Jika Daring/Hybrid, pastikan menyertakan Link Virtual Meeting.'
+        }),
+        ('Poster / Banner Acara', {'fields': ('image', 'image_preview'), 'description': 'Disarankan mengunggah gambar dengan rasio 16:9 (misal 1200x675px) atau 4:3 agar tampilan di TV Kiosk dan Portal optimal.'}),
+        ('Pengaturan E-Sertifikat & Template', {
+            'fields': (
+                'cert_template',
+                'cert_template_preview',
+                'cert_font_family',
+                'cert_name_pos_y',
+                'cert_name_font_size',
+                'cert_name_color',
+                'cert_show_nim',
+                'cert_nim_pos_y',
+                'cert_number_template',
+                'cert_number_pos_y',
+            ),
+            'description': 'Unggah file gambar background sertifikat kosong (PNG/JPG, disarankan A4 Landscape). Teks nama peserta akan otomatis dicetak simetris di tengah horizontal sesuai koordinat vertikal (Y).'
+        }),
         ('Pendaftaran', {'fields': ('registration_open', 'registration_close')}),
         ('Pengaturan Poin', {'fields': ('points_register', 'points_attend')}),
         ('Kode Klaim Kehadiran', {'fields': ('claim_code', 'claim_code_active')}),
     )
+
+    @display(description='Kategori', label=True)
+    def category_badge(self, obj):
+        colors = {
+            'seminar': '#3b82f6',
+            'workshop': '#8b5cf6',
+            'training': '#f59e0b',
+            'webinar': '#06b6d4',
+            'book_review': '#ec4899',
+            'other': '#6b7280',
+        }
+        color = colors.get(obj.category, '#3b82f6')
+        return format_html('<span style="background:{}; color:#fff; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:700;">{}</span>', color, obj.get_category_display())
+
+    @display(description='Format', label=True)
+    def mode_badge(self, obj):
+        mode_configs = {
+            'offline': {'color': '#10b981', 'label': 'Offline'},
+            'online': {'color': '#06b6d4', 'label': 'Online'},
+            'hybrid': {'color': '#8b5cf6', 'label': 'Hybrid'},
+        }
+        cfg = mode_configs.get(obj.event_mode, {'color': '#6b7280', 'label': obj.get_event_mode_display()})
+        return format_html('<span style="background:{}; color:#fff; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:700;">{}</span>', cfg['color'], cfg['label'])
+
+    @display(description='Poster')
+    def image_thumbnail(self, obj):
+        if obj.image:
+            return format_html('<img src="{}" style="width: 50px; height: 30px; object-fit: cover; border-radius: 4px; border: 1px solid #ddd;" />', obj.image.url)
+        return "-"
+
+    @display(description='Preview Poster Saat Ini')
+    def image_preview(self, obj):
+        if obj.image:
+            return format_html('<img src="{}" style="max-width: 320px; max-height: 180px; object-fit: cover; border-radius: 8px; border: 1px solid #ccc; box-shadow: 0 2px 6px rgba(0,0,0,0.1);" />', obj.image.url)
+        return "Belum ada poster diunggah."
+
+    @display(description='Visual Designer & Live Preview Template')
+    def cert_template_preview(self, obj):
+        img_url = obj.cert_template.url if (obj and obj.cert_template) else ''
+        html = render_to_string('leaderboard/admin/cert_designer.html', {
+            'obj': obj,
+            'img_url': img_url
+        })
+        return mark_safe(html)
+
+    @display(description='E-Sertifikat', boolean=True)
+    def cert_status(self, obj):
+        return bool(obj.cert_template)
 
     @display(description='Status Kode', boolean=True)
     def code_status(self, obj):
@@ -316,25 +397,38 @@ class SeminarAdmin(ModelAdmin):
 
 @admin.register(SeminarRegistration)
 class SeminarRegistrationAdmin(ModelAdmin):
-    list_display = ('member_id', 'get_member_name', 'seminar', 'email', 'registered_at', 'attended_at', 'status_badge')
+    list_display = ('member_id', 'get_member_name', 'seminar', 'email', 'registered_at', 'attended_at', 'status_badge', 'certificate_download')
     list_filter = ('status', 'seminar')
-    search_fields = ('member_id', 'email', 'seminar__title')
-    actions = ['mark_as_attended']
+    search_fields = ('member_id', 'email', 'seminar__title', 'certificate_number')
+    actions = ['mark_as_attended', 'generate_certificates_action']
 
     @display(description='Status', label=True)
     def status_badge(self, obj):
         return "Attended" if obj.status == 'attended' else "Registered"
+
+    @display(description='Sertifikat PDF')
+    def certificate_download(self, obj):
+        if obj.certificate_pdf:
+            return format_html(
+                '<a href="{}" target="_blank" style="display:inline-flex; align-items:center; gap:5px; background:#10b981; color:#fff; padding:3px 8px; border-radius:4px; text-decoration:none; font-size:11px; font-weight:700;">'
+                '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>Unduh PDF</a>',
+                obj.certificate_pdf.url
+            )
+        if obj.status == 'attended' and obj.seminar.cert_template:
+            return format_html('<span style="color:#f59e0b; font-size:11px;">Belum Di-generate</span>')
+        return "-"
 
     def get_member_name(self, obj):
         member = Member.objects.filter(member_id=obj.member_id).first()
         return member.name if member else 'Tidak Terdaftar'
     get_member_name.short_description = 'Nama Anggota'
 
-    @admin.action(description="Tandai peserta terpilih sebagai Hadir")
+    @admin.action(description="Tandai peserta terpilih sebagai Hadir & Kirim Sertifikat")
     def mark_as_attended(self, request, queryset):
         from django.utils import timezone
         from django.db import transaction
         from leaderboard.models import PointTransaction
+        from leaderboard.cert_utils import generate_certificate_pdf, send_certificate_email
         
         count = 0
         for reg in queryset.filter(status='registered'):
@@ -348,15 +442,27 @@ class SeminarRegistrationAdmin(ModelAdmin):
                     cardnumber=reg.member_id,
                     amount=reg.seminar.points_attend,
                     transaction_type='seminar',
-                    description=f"Kehadiran Seminar (Manual Admin): {reg.seminar.title}"
+                    description=f"Kehadiran Seminar (Admin): {reg.seminar.title}"
                 )
-                count += 1
-                
-        # Clear cache
-        from django.core.cache import cache
-        cache.clear()
-        
-        self.message_user(request, f"{count} peserta berhasil ditandai sebagai hadir dan poin ditambahkan.")
+
+            # Generate cert & send email
+            if reg.seminar.cert_template:
+                generate_certificate_pdf(reg)
+                send_certificate_email(reg)
+
+            count += 1
+            
+        self.message_user(request, f"{count} peserta berhasil ditandai Hadir dan sertifikat diproses.")
+
+    @admin.action(description="Generate / Regenerate Ulang Sertifikat PDF Peserta")
+    def generate_certificates_action(self, request, queryset):
+        from leaderboard.cert_utils import generate_certificate_pdf
+        generated = 0
+        for reg in queryset.filter(status='attended'):
+            if reg.seminar.cert_template:
+                generate_certificate_pdf(reg)
+                generated += 1
+        self.message_user(request, f"{generated} sertifikat PDF berhasil di-generate ulang.")
 
 from .models import APIKey
 

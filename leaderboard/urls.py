@@ -9,6 +9,8 @@ app_name = 'leaderboard'
 urlpatterns = [
     # Main page
     path('', views.index, name='index'),
+    path('tv/', views.kiosk_view, name='tv_display'),
+    path('kiosk/', views.kiosk_view, name='kiosk_display'),
 
     # JSON API endpoints
     path('api/overview/', views.api_overview, name='api_overview'),

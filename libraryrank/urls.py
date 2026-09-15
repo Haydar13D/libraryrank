@@ -6,11 +6,16 @@ from django.contrib.auth import views as auth_views
 import django_cas_ng.views as cas_views
 
 from leaderboard.cas_views import CASLogoutView
+from leaderboard.db_explorer_views import db_explorer_dashboard, db_explorer_api
 
 from django.views.static import serve
 from django.urls import re_path
 
 urlpatterns = [
+    # ── Database Explorer (Lite phpMyAdmin) ──
+    path('admin/db-explorer/api/', db_explorer_api,       name='db_explorer_api'),
+    path('admin/db-explorer/',     db_explorer_dashboard, name='db_explorer_dashboard'),
+
     # ── Override Admin Logout for CAS Single Sign-Out (Supports GET & POST) ──
     path('admin/logout/',      CASLogoutView.as_view(),        name='admin_logout'),
     path('admin/', admin.site.urls),

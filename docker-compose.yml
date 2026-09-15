@@ -9,7 +9,7 @@ services:
       - .env
     environment:
       - DB_HOST=host.docker.internal
-    command: gunicorn --bind 0.0.0.0:8000 --certfile /app/cert.pem --keyfile /app/key.pem --workers 2 --reload libraryrank.wsgi:application
+    command: gunicorn --bind 0.0.0.0:8000 --certfile /app/cert.pem --keyfile /app/key.pem --workers 3 --timeout 120 --reload libraryrank.wsgi:application
     restart: unless-stopped
     extra_hosts:
       - "host.docker.internal:host-gateway"

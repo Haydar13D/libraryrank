@@ -1,0 +1,1972 @@
+{% extends "unfold/layouts/base.html" %}
+{% load static %}
+
+{% block title %}Database Explorer | LibraryRank{% endblock %}
+
+{% block breadcrumbs %}
+<div class="dbe-breadcrumbs">
+    <a href="{% url 'admin:index' %}">Dashboard</a>
+    <span class="dbe-sep">/</span>
+    <span>Database Explorer</span>
+</div>
+{% endblock %}
+
+{% block content %}
+<script>
+    (function() {
+        const saved = localStorage.getItem('theme');
+        const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (saved === 'dark' || (!saved && prefersDark)) {
+            document.documentElement.classList.add('dark');
+            document.documentElement.dataset.theme = 'dark';
+        } else if (saved === 'light') {
+            document.documentElement.classList.remove('dark');
+            document.documentElement.dataset.theme = 'light';
+        }
+    })();
+</script>
+
+<div class="dbe-root">
+    <!-- ════════════════ TOP APP BAR ════════════════ -->
+    <div class="dbe-appbar">
+        <div class="dbe-appbar-left">
+            <span class="dbe-app-title">Database Explorer</span>
+            <div class="dbe-db-picker">
+                <select id="dbSelect" class="dbe-input-select">
+                    {% for db in available_dbs %}
+                    <option value="{{ db.name }}" {% if db.is_default %}selected{% endif %}>
+                        {{ db.name }} ({{ db.engine }})
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="dbe-meta-summary">
+                <span id="statTotalTables">0</span> tables
+                <span class="dbe-dot">•</span>
+                <span id="statTotalRows">0</span> rows
+                <span class="dbe-dot">•</span>
+                <span id="statTotalSize">0 KB</span>
+            </div>
+        </div>
+
+        <div class="dbe-appbar-right">
+            <button id="btnFullscreenToggle" type="button" class="dbe-btn dbe-btn-secondary" title="Toggle Fullscreen Mode">
+                <span id="fsToggleIcon" class="material-symbols-outlined dbe-btn-icon">fullscreen</span>
+                <span id="fsToggleText">Fullscreen</span>
+            </button>
+            <button id="btnGlobalSql" class="dbe-btn dbe-btn-secondary" title="Open SQL Editor">
+                <span class="material-symbols-outlined dbe-btn-icon">terminal</span>
+                <span>SQL</span>
+            </button>
+            <button id="btnFullDbBackup" class="dbe-btn dbe-btn-secondary" title="Export SQL Dump">
+                <span class="material-symbols-outlined dbe-btn-icon">download</span>
+                <span>Export Dump</span>
+            </button>
+            <button id="btnThemeToggle" type="button" class="dbe-btn dbe-btn-secondary" title="Toggle Light/Dark Theme">
+                <span id="themeToggleIcon" class="material-symbols-outlined dbe-btn-icon">dark_mode</span>
+                <span id="themeToggleText">Dark</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- ════════════════ WORKSPACE (SIDEBAR + MAIN) ════════════════ -->
+    <div class="dbe-workspace">
+        <!-- ─── SIDEBAR: TABLES ─── -->
+        <aside class="dbe-sidebar">
+            <div class="dbe-sidebar-top">
+                <div class="dbe-search-wrapper">
+                    <span class="material-symbols-outlined dbe-search-ico">search</span>
+                    <input type="text" id="tableFilterInput" placeholder="Filter tables..." class="dbe-input-search">
+                    <button id="btnClearTableFilter" class="dbe-clear-btn hidden" title="Clear filter">×</button>
+                </div>
+                <button id="btnRefreshTables" class="dbe-btn-icon-only" title="Refresh tables list">
+                    <span class="material-symbols-outlined">refresh</span>
+                </button>
+            </div>
+
+            <!-- Prefix Filter Bar -->
+            <div class="dbe-prefix-tabs">
+                <button class="tbl-filter-chip active-chip" data-prefix="">All (<span id="tableCountBadge">0</span>)</button>
+                <button class="tbl-filter-chip" data-prefix="leaderboard">leaderboard</button>
+                <button class="tbl-filter-chip" data-prefix="auth">auth</button>
+                <button class="tbl-filter-chip" data-prefix="django">django</button>
+            </div>
+
+            <!-- Tables List -->
+            <div id="tableListContainer" class="dbe-table-list custom-scroll">
+                <div class="dbe-state-text">Loading tables...</div>
+            </div>
+        </aside>
+
+        <!-- ─── MAIN CONTENT VIEW ─── -->
+        <main class="dbe-main">
+            <!-- Table Header & Nav Tabs -->
+            <div class="dbe-main-header">
+                <div class="dbe-header-info">
+                    <h1 id="activeTableTitle" class="dbe-table-heading">Select a table</h1>
+                    <button id="btnCopyTableName" class="dbe-btn-icon-only hidden" title="Copy table name">
+                        <span class="material-symbols-outlined">content_copy</span>
+                    </button>
+                    <span id="activeTableMetaPills" class="dbe-table-tag hidden">
+                        <span id="tableRowMetaBadge">0 rows</span>
+                    </span>
+                </div>
+
+                <div class="dbe-tabs">
+                    <button class="nav-tab active" data-tab="tabBrowse">Data</button>
+                    <button class="nav-tab" data-tab="tabStructure">Structure</button>
+                    <button class="nav-tab" data-tab="tabSql">SQL Query</button>
+                    <button class="nav-tab" data-tab="tabExport">Export / Dump</button>
+                </div>
+            </div>
+
+            <!-- ──────────────── TAB 1: DATA BROWSER ──────────────── -->
+            <section id="tabBrowse" class="tab-pane active-pane">
+                <div class="dbe-toolbar">
+                    <div class="dbe-toolbar-actions">
+                        <button id="btnInsertRow" class="dbe-btn dbe-btn-primary" disabled>
+                            <span class="material-symbols-outlined dbe-btn-icon">add</span>
+                            <span>Insert Row</span>
+                        </button>
+                        <button id="btnRefreshData" class="dbe-btn dbe-btn-secondary" title="Reload data">
+                            <span class="material-symbols-outlined dbe-btn-icon">refresh</span>
+                            <span>Reload</span>
+                        </button>
+                    </div>
+
+                    <div class="dbe-toolbar-filter">
+                        <input type="text" id="dataSearchInput" placeholder="Search rows..." class="dbe-input-search dbe-input-inline">
+                        <select id="pageSizeSelect" class="dbe-input-select dbe-input-sm">
+                            <option value="25">25 rows</option>
+                            <option value="50">50 rows</option>
+                            <option value="100">100 rows</option>
+                            <option value="200">200 rows</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Grid Table -->
+                <div class="dbe-grid-wrap">
+                    <div class="dbe-grid-scroll custom-scroll">
+                        <table id="dataTable" class="dbe-data-table">
+                            <thead id="dataThead">
+                                <tr>
+                                    <th>Select a table from the sidebar</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dataTbody">
+                                <tr>
+                                    <td class="dbe-empty-state">No table selected.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Pagination -->
+                    <div id="dataPagination" class="dbe-pagination">
+                        <div id="paginationInfo" class="dbe-pagination-text">Showing 0 of 0 rows</div>
+                        <div class="dbe-pagination-btns">
+                            <button id="btnPrevPage" class="dbe-btn dbe-btn-secondary dbe-btn-sm" disabled>Previous</button>
+                            <span id="pageNumberDisplay" class="dbe-page-num">1 / 1</span>
+                            <button id="btnNextPage" class="dbe-btn dbe-btn-secondary dbe-btn-sm" disabled>Next</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ──────────────── TAB 2: STRUCTURE ──────────────── -->
+            <section id="tabStructure" class="tab-pane hidden">
+                <div class="dbe-grid-wrap">
+                    <div class="dbe-grid-scroll custom-scroll">
+                        <table class="dbe-data-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 40px; text-align: center;">#</th>
+                                    <th>Column</th>
+                                    <th>Type</th>
+                                    <th>Nullable</th>
+                                    <th>Key</th>
+                                    <th>Default</th>
+                                    <th>Extra</th>
+                                </tr>
+                            </thead>
+                            <tbody id="structureTbody">
+                                <tr>
+                                    <td colspan="7" class="dbe-empty-state">Select a table to inspect structure.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ──────────────── TAB 3: SQL STUDIO ──────────────── -->
+            <section id="tabSql" class="tab-pane hidden">
+                <div class="dbe-sql-panel">
+                    <div class="dbe-sql-snippets-bar">
+                        <span class="dbe-label-muted">Snippets:</span>
+                        <button class="sql-snippet-btn" data-snip="SELECT * FROM `{TABLE}` LIMIT 50;">SELECT *</button>
+                        <button class="sql-snippet-btn" data-snip="SELECT COUNT(*) FROM `{TABLE}`; ">COUNT(*)</button>
+                        <button class="sql-snippet-btn" data-snip="SHOW TABLES;">SHOW TABLES</button>
+                        <button class="sql-snippet-btn" data-snip="DESCRIBE `{TABLE}`;">DESCRIBE</button>
+                    </div>
+
+                    <textarea id="sqlQueryInput" rows="5" placeholder="Enter SQL query (e.g. SELECT * FROM leaderboard_member WHERE points > 0 LIMIT 20;)" class="dbe-sql-input"></textarea>
+
+                    <div class="dbe-sql-actions">
+                        <span class="dbe-shortcut-hint">Press <kbd>Ctrl</kbd> + <kbd>Enter</kbd> to execute</span>
+                        <button id="btnExecuteSql" class="dbe-btn dbe-btn-primary">
+                            <span class="material-symbols-outlined dbe-btn-icon">play_arrow</span>
+                            <span>Run Query</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="sqlResultContainer" class="dbe-grid-wrap" style="margin-top: 12px; min-height: 200px;">
+                    <div class="dbe-sql-res-header">
+                        <span>Query Results</span>
+                        <span id="sqlExecutionTime" class="dbe-exec-time"></span>
+                    </div>
+                    <div class="dbe-grid-scroll custom-scroll">
+                        <div id="sqlResultEmptyState" class="dbe-empty-state">Enter a SQL statement and click Run Query.</div>
+                        <table id="sqlResultTable" class="dbe-data-table hidden">
+                            <thead id="sqlResultThead"></thead>
+                            <tbody id="sqlResultTbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ──────────────── TAB 4: EXPORT / DUMP ──────────────── -->
+            <section id="tabExport" class="tab-pane hidden">
+                <div class="dbe-export-container">
+                    <div class="dbe-export-box">
+                        <div class="dbe-export-header">
+                            <h3>Full Database SQL Dump</h3>
+                            <p>Export structure and data for all tables in the active database connection.</p>
+                        </div>
+                        <button id="btnExportFullSql" class="dbe-btn dbe-btn-primary">
+                            <span class="material-symbols-outlined dbe-btn-icon">download</span>
+                            <span>Download Full SQL Dump</span>
+                        </button>
+                    </div>
+
+                    <div class="dbe-export-box">
+                        <div class="dbe-export-header">
+                            <h3 id="exportTableLabel">Export Table: (Select table)</h3>
+                            <p>Export selected table data as SQL insert statements or a standard CSV file.</p>
+                        </div>
+                        <div class="dbe-export-actions">
+                            <button id="btnExportTableSql" class="dbe-btn dbe-btn-secondary" disabled>
+                                <span class="material-symbols-outlined dbe-btn-icon">description</span>
+                                <span>Export Table (.sql)</span>
+                            </button>
+                            <button id="btnExportTableCsv" class="dbe-btn dbe-btn-secondary" disabled>
+                                <span class="material-symbols-outlined dbe-btn-icon">grid_on</span>
+                                <span>Export Table (.csv)</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+</div>
+
+<!-- ════════════════ MODAL: ROW EDIT / INSERT ════════════════ -->
+<div id="rowModal" class="dbe-modal-overlay hidden">
+    <div class="dbe-modal-card">
+        <div class="dbe-modal-card-header">
+            <h3 id="rowModalTitle">Edit Record</h3>
+            <button id="btnCloseRowModal" class="dbe-btn-icon-only">×</button>
+        </div>
+        <form id="rowForm" class="dbe-modal-card-body custom-scroll">
+            <div id="rowFormFields" class="dbe-fields-grid"></div>
+        </form>
+        <div class="dbe-modal-card-footer">
+            <button type="button" id="btnCancelRowModal" class="dbe-btn dbe-btn-secondary">Cancel</button>
+            <button type="button" id="btnSaveRowModal" class="dbe-btn dbe-btn-primary">Save Changes</button>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Notifications -->
+<div id="toastContainer" class="dbe-toast-container"></div>
+
+<!-- ════════════════ CLEAN DEVELOPER TOOL STYLES ════════════════ -->
+<style>
+/* ─── Modern Developer Tool Theme ─── */
+:root {
+    --dbe-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --dbe-font-mono: ui-monospace, "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    
+    /* Light theme tokens */
+    --dbe-bg: #f8fafc;
+    --dbe-surface: #ffffff;
+    --dbe-surface-subtle: #f1f5f9;
+    --dbe-border: #e2e8f0;
+    --dbe-border-dark: #cbd5e1;
+    --dbe-text: #0f172a;
+    --dbe-text-muted: #64748b;
+    --dbe-text-subtle: #94a3b8;
+    --dbe-primary: #0284c7;
+    --dbe-primary-hover: #0369a1;
+    --dbe-primary-fg: #ffffff;
+    --dbe-row-hover: #f8fafc;
+    --dbe-row-stripe: #fafbfc;
+    --dbe-table-header: #f8fafc;
+    --dbe-code-bg: #0f172a;
+    --dbe-code-fg: #38bdf8;
+    --dbe-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --dbe-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+}
+
+html.dark, body.dark, [data-theme="dark"] {
+    /* Dark theme tokens (VSCode / TablePlus style) */
+    --dbe-bg: #111418;
+    --dbe-surface: #181c24;
+    --dbe-surface-subtle: #212631;
+    --dbe-border: #282f3d;
+    --dbe-border-dark: #374151;
+    --dbe-text: #f1f5f9;
+    --dbe-text-muted: #94a3b8;
+    --dbe-text-subtle: #64748b;
+    --dbe-primary: #38bdf8;
+    --dbe-primary-hover: #0ea5e9;
+    --dbe-primary-fg: #0f172a;
+    --dbe-row-hover: #222834;
+    --dbe-row-stripe: #1b202a;
+    --dbe-table-header: #1f2430;
+    --dbe-code-bg: #0d1117;
+    --dbe-code-fg: #38bdf8;
+    --dbe-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+    --dbe-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+}
+
+.dbe-root {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    font-family: var(--dbe-font-sans);
+    color: var(--dbe-text);
+    font-size: 13px;
+    line-height: 1.4;
+    height: calc(100vh - 105px);
+    min-height: 520px;
+}
+
+.dbe-root.is-fullscreen {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 99999 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    padding: 10px !important;
+    background: var(--dbe-bg) !important;
+    box-sizing: border-box !important;
+}
+
+.dbe-breadcrumbs {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--dbe-text-muted);
+    margin-bottom: 4px;
+}
+.dbe-breadcrumbs a {
+    color: var(--dbe-text-muted);
+    text-decoration: none;
+}
+.dbe-breadcrumbs a:hover {
+    color: var(--dbe-primary);
+}
+.dbe-sep {
+    color: var(--dbe-text-subtle);
+}
+
+/* Custom Scrollbars */
+.custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+.custom-scroll::-webkit-scrollbar-track { background: transparent; }
+.custom-scroll::-webkit-scrollbar-thumb { background: var(--dbe-border-dark); border-radius: 3px; }
+.custom-scroll::-webkit-scrollbar-thumb:hover { background: var(--dbe-text-subtle); }
+
+/* ─── App Bar ─── */
+.dbe-appbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 8px 14px;
+    background: var(--dbe-surface);
+    border: 1px solid var(--dbe-border);
+    border-radius: 6px;
+    box-shadow: var(--dbe-shadow-sm);
+}
+
+.dbe-appbar-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.dbe-app-title {
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: -0.01em;
+}
+
+.dbe-meta-summary {
+    font-size: 12px;
+    color: var(--dbe-text-muted);
+    font-family: var(--dbe-font-mono);
+}
+.dbe-dot {
+    margin: 0 4px;
+    color: var(--dbe-text-subtle);
+}
+
+.dbe-appbar-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* ─── Buttons ─── */
+.dbe-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+    white-space: nowrap;
+    text-decoration: none;
+}
+.dbe-btn-icon {
+    font-size: 15px !important;
+}
+
+.dbe-btn-primary {
+    background: var(--dbe-primary);
+    color: var(--dbe-primary-fg);
+    border-color: var(--dbe-primary);
+}
+.dbe-btn-primary:hover:not(:disabled) {
+    background: var(--dbe-primary-hover);
+}
+
+.dbe-btn-secondary {
+    background: var(--dbe-surface-subtle);
+    color: var(--dbe-text);
+    border-color: var(--dbe-border);
+}
+.dbe-btn-secondary:hover:not(:disabled) {
+    background: var(--dbe-border);
+}
+
+.dbe-btn-sm {
+    padding: 3px 8px;
+    font-size: 11px;
+}
+
+.dbe-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.dbe-btn-icon-only {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--dbe-text-muted);
+    cursor: pointer;
+}
+.dbe-btn-icon-only:hover {
+    background: var(--dbe-surface-subtle);
+    color: var(--dbe-text);
+}
+.dbe-btn-icon-only span {
+    font-size: 16px;
+}
+
+/* ─── Inputs & Selects ─── */
+.dbe-input-select,
+.dbe-input-search {
+    padding: 4px 8px;
+    border-radius: 5px;
+    border: 1px solid var(--dbe-border);
+    background: var(--dbe-surface-subtle);
+    color: var(--dbe-text);
+    font-size: 12px;
+    outline: none;
+    transition: border-color 0.15s ease;
+}
+.dbe-input-select:focus,
+.dbe-input-search:focus {
+    border-color: var(--dbe-primary);
+}
+.dbe-input-sm {
+    padding: 3px 6px;
+    font-size: 11px;
+}
+
+/* ─── Workspace Layout ─── */
+.dbe-workspace {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex: 1;
+    min-height: 0;
+    height: 100%;
+}
+@media (min-width: 1024px) {
+    .dbe-workspace {
+        flex-direction: row;
+        align-items: stretch;
+    }
+}
+
+/* ─── Sidebar ─── */
+.dbe-sidebar {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: var(--dbe-surface);
+    border: 1px solid var(--dbe-border);
+    border-radius: 6px;
+    padding: 10px;
+    box-shadow: var(--dbe-shadow-sm);
+    min-height: 0;
+    height: 100%;
+    box-sizing: border-box;
+}
+@media (min-width: 1024px) {
+    .dbe-sidebar {
+        width: 250px;
+        flex-shrink: 0;
+    }
+}
+
+.dbe-sidebar-top {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.dbe-search-wrapper {
+    position: relative;
+    flex: 1;
+    display: flex;
+    align-items: center;
+}
+.dbe-search-ico {
+    position: absolute;
+    left: 7px;
+    font-size: 14px;
+    color: var(--dbe-text-subtle);
+    pointer-events: none;
+}
+.dbe-search-wrapper input {
+    width: 100%;
+    padding-left: 26px;
+    padding-right: 22px;
+}
+.dbe-clear-btn {
+    position: absolute;
+    right: 6px;
+    background: none;
+    border: none;
+    color: var(--dbe-text-subtle);
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.dbe-prefix-tabs {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+}
+
+.tbl-filter-chip {
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 500;
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--dbe-text-muted);
+    cursor: pointer;
+    white-space: nowrap;
+}
+.tbl-filter-chip:hover {
+    background: var(--dbe-surface-subtle);
+    color: var(--dbe-text);
+}
+.tbl-filter-chip.active-chip {
+    background: var(--dbe-surface-subtle);
+    border-color: var(--dbe-border);
+    color: var(--dbe-primary);
+    font-weight: 700;
+}
+
+.dbe-table-list {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.table-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 5px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-family: var(--dbe-font-mono);
+    color: var(--dbe-text);
+    background: transparent;
+    border: 1px solid transparent;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.1s ease;
+}
+.table-item:hover {
+    background: var(--dbe-surface-subtle);
+}
+.table-item.active {
+    background: var(--dbe-surface-subtle);
+    border-color: var(--dbe-border);
+    color: var(--dbe-primary);
+    font-weight: 700;
+}
+
+.table-item-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.table-item-badge {
+    font-size: 10px;
+    color: var(--dbe-text-subtle);
+    margin-left: 6px;
+}
+
+/* ─── Main Content ─── */
+.dbe-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: var(--dbe-surface);
+    border: 1px solid var(--dbe-border);
+    border-radius: 6px;
+    box-shadow: var(--dbe-shadow-sm);
+    overflow: hidden;
+    min-height: 0;
+    height: 100%;
+}
+
+.dbe-main-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 8px 14px;
+    background: var(--dbe-surface-subtle);
+    border-bottom: 1px solid var(--dbe-border);
+}
+
+.dbe-header-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.dbe-table-heading {
+    font-size: 13px;
+    font-weight: 700;
+    font-family: var(--dbe-font-mono);
+    margin: 0;
+}
+
+.dbe-table-tag {
+    font-size: 11px;
+    font-family: var(--dbe-font-mono);
+    color: var(--dbe-text-muted);
+    background: var(--dbe-surface);
+    border: 1px solid var(--dbe-border);
+    padding: 1px 6px;
+    border-radius: 3px;
+}
+
+.dbe-tabs {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.nav-tab {
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--dbe-text-muted);
+    cursor: pointer;
+}
+.nav-tab:hover {
+    color: var(--dbe-text);
+}
+.nav-tab.active {
+    background: var(--dbe-surface);
+    border-color: var(--dbe-border);
+    color: var(--dbe-text);
+    font-weight: 700;
+}
+
+/* ─── Tab Panes ─── */
+.tab-pane {
+    padding: 10px 12px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+}
+.tab-pane.hidden {
+    display: none !important;
+}
+
+.dbe-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.dbe-toolbar-actions,
+.dbe-toolbar-filter {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.dbe-input-inline {
+    width: 180px;
+}
+
+/* ─── Grid Table ─── */
+.dbe-grid-wrap {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--dbe-border);
+    border-radius: 4px;
+    background: var(--dbe-surface);
+    overflow: hidden;
+    min-height: 0;
+}
+
+.dbe-grid-scroll {
+    flex: 1;
+    overflow: auto;
+    min-height: 0;
+}
+
+.dbe-data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    text-align: left;
+}
+
+.dbe-data-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    padding: 6px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    font-family: var(--dbe-font-mono);
+    background: var(--dbe-table-header);
+    color: var(--dbe-text-muted);
+    border-bottom: 1px solid var(--dbe-border);
+    border-right: 1px solid var(--dbe-border);
+    white-space: nowrap;
+}
+
+.dbe-data-table tbody td {
+    padding: 5px 10px;
+    border-bottom: 1px solid var(--dbe-border);
+    border-right: 1px solid var(--dbe-border);
+    font-family: var(--dbe-font-mono);
+    white-space: nowrap;
+    max-width: 320px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dbe-data-table tbody tr:nth-child(even) {
+    background: var(--dbe-row-stripe);
+}
+.dbe-data-table tbody tr:hover {
+    background: var(--dbe-row-hover) !important;
+}
+
+.dbe-empty-state {
+    padding: 40px 10px;
+    text-align: center;
+    color: var(--dbe-text-muted);
+    font-size: 12px;
+}
+
+.dbe-null-val {
+    color: var(--dbe-text-subtle);
+    font-style: italic;
+}
+
+.dbe-actions-cell {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    justify-content: center;
+}
+
+.dbe-row-btn {
+    background: none;
+    border: 1px solid var(--dbe-border);
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-size: 11px;
+    color: var(--dbe-text-muted);
+    cursor: pointer;
+}
+.dbe-row-btn:hover {
+    color: var(--dbe-text);
+    background: var(--dbe-surface-subtle);
+}
+.dbe-row-btn-del:hover {
+    color: #ef4444;
+    border-color: #fca5a5;
+}
+
+/* ─── Pagination ─── */
+.dbe-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 12px;
+    background: var(--dbe-surface-subtle);
+    border-top: 1px solid var(--dbe-border);
+    font-size: 11px;
+}
+
+.dbe-pagination-text {
+    color: var(--dbe-text-muted);
+}
+
+.dbe-pagination-btns {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.dbe-page-num {
+    font-family: var(--dbe-font-mono);
+    font-weight: 600;
+}
+
+/* ─── SQL Panel ─── */
+.dbe-sql-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px;
+    background: var(--dbe-surface-subtle);
+    border: 1px solid var(--dbe-border);
+    border-radius: 4px;
+}
+
+.dbe-sql-snippets-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.dbe-label-muted {
+    font-size: 11px;
+    color: var(--dbe-text-muted);
+}
+
+.sql-snippet-btn {
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-family: var(--dbe-font-mono);
+    background: var(--dbe-surface);
+    border: 1px solid var(--dbe-border);
+    color: var(--dbe-text-muted);
+    cursor: pointer;
+}
+.sql-snippet-btn:hover {
+    color: var(--dbe-text);
+    border-color: var(--dbe-border-dark);
+}
+
+.dbe-sql-input {
+    width: 100%;
+    padding: 8px;
+    border-radius: 4px;
+    background: var(--dbe-code-bg);
+    color: var(--dbe-code-fg);
+    border: 1px solid var(--dbe-border);
+    font-family: var(--dbe-font-mono);
+    font-size: 12px;
+    line-height: 1.5;
+    outline: none;
+    resize: vertical;
+}
+
+.dbe-sql-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.dbe-shortcut-hint {
+    font-size: 11px;
+    color: var(--dbe-text-muted);
+}
+.dbe-shortcut-hint kbd {
+    padding: 1px 4px;
+    border-radius: 3px;
+    background: var(--dbe-surface);
+    border: 1px solid var(--dbe-border);
+    font-family: var(--dbe-font-mono);
+}
+
+.dbe-sql-res-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 12px;
+    background: var(--dbe-table-header);
+    border-bottom: 1px solid var(--dbe-border);
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.dbe-exec-time {
+    font-family: var(--dbe-font-mono);
+    color: #10b981;
+}
+
+/* ─── Export Tab ─── */
+.dbe-export-container {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+}
+@media (min-width: 768px) {
+    .dbe-export-container {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+.dbe-export-box {
+    padding: 16px;
+    background: var(--dbe-surface-subtle);
+    border: 1px solid var(--dbe-border);
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.dbe-export-header h3 {
+    font-size: 14px;
+    font-weight: 700;
+    margin: 0 0 4px 0;
+}
+.dbe-export-header p {
+    font-size: 12px;
+    color: var(--dbe-text-muted);
+    margin: 0;
+}
+
+.dbe-export-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* ─── Modal ─── */
+.dbe-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100000;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+}
+.dbe-modal-overlay.hidden {
+    display: none !important;
+}
+
+.dbe-modal-card {
+    width: 100%;
+    max-width: 580px;
+    max-height: 85vh;
+    background: var(--dbe-surface);
+    border: 1px solid var(--dbe-border-dark);
+    border-radius: 6px;
+    box-shadow: var(--dbe-shadow-md);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.dbe-modal-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    background: var(--dbe-surface-subtle);
+    border-bottom: 1px solid var(--dbe-border);
+}
+.dbe-modal-card-header h3 {
+    font-size: 13px;
+    font-weight: 700;
+    margin: 0;
+}
+
+.dbe-modal-card-body {
+    padding: 16px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.dbe-fields-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+}
+@media (min-width: 540px) {
+    .dbe-fields-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+.dbe-form-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.dbe-form-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 11px;
+    font-weight: 600;
+    font-family: var(--dbe-font-mono);
+}
+
+.dbe-form-type {
+    font-size: 10px;
+    color: var(--dbe-text-subtle);
+}
+
+.dbe-form-input {
+    padding: 5px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--dbe-border);
+    background: var(--dbe-surface-subtle);
+    color: var(--dbe-text);
+    font-family: var(--dbe-font-mono);
+    font-size: 12px;
+    outline: none;
+}
+.dbe-form-input:focus {
+    border-color: var(--dbe-primary);
+}
+.dbe-form-input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.dbe-modal-card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 10px 16px;
+    background: var(--dbe-surface-subtle);
+    border-top: 1px solid var(--dbe-border);
+}
+
+/* ─── Toasts ─── */
+.dbe-toast-container {
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    z-index: 100001;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    pointer-events: none;
+}
+
+.dbe-toast-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    border-radius: 4px;
+    background: #181c24;
+    border: 1px solid #282f3d;
+    color: #f1f5f9;
+    font-size: 12px;
+    font-weight: 500;
+    box-shadow: var(--dbe-shadow-md);
+    pointer-events: auto;
+}
+</style>
+
+<!-- ════════════════ APPLICATION LOGIC ════════════════ -->
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const API_URL = "{% url 'db_explorer_api' %}";
+    let activeDb = document.getElementById('dbSelect').value;
+    let activeTable = '';
+    let allTablesList = [];
+    let currentColumns = [];
+    let currentPkCols = [];
+    let currentRows = [];
+    let currentPage = 1;
+    let currentPageSize = 25;
+    let currentSortCol = '';
+    let currentSortDir = 'ASC';
+    let currentSearch = '';
+    let activePrefixFilter = '';
+    let editMode = false;
+    let currentEditPk = {};
+
+    // Elements
+    const dbSelect = document.getElementById('dbSelect');
+    const tableListContainer = document.getElementById('tableListContainer');
+    const tableFilterInput = document.getElementById('tableFilterInput');
+    const btnClearTableFilter = document.getElementById('btnClearTableFilter');
+    const tableCountBadge = document.getElementById('tableCountBadge');
+    const statTotalTables = document.getElementById('statTotalTables');
+    const statTotalRows = document.getElementById('statTotalRows');
+    const statTotalSize = document.getElementById('statTotalSize');
+    const activeTableTitle = document.getElementById('activeTableTitle');
+    const activeTableMetaPills = document.getElementById('activeTableMetaPills');
+    const tableRowMetaBadge = document.getElementById('tableRowMetaBadge');
+    const btnCopyTableName = document.getElementById('btnCopyTableName');
+    const dataThead = document.getElementById('dataThead');
+    const dataTbody = document.getElementById('dataTbody');
+    const dataSearchInput = document.getElementById('dataSearchInput');
+    const pageSizeSelect = document.getElementById('pageSizeSelect');
+    const paginationInfo = document.getElementById('paginationInfo');
+    const pageNumberDisplay = document.getElementById('pageNumberDisplay');
+    const btnPrevPage = document.getElementById('btnPrevPage');
+    const btnNextPage = document.getElementById('btnNextPage');
+    const btnRefreshData = document.getElementById('btnRefreshData');
+    const btnRefreshTables = document.getElementById('btnRefreshTables');
+    const btnInsertRow = document.getElementById('btnInsertRow');
+    const structureTbody = document.getElementById('structureTbody');
+    const sqlQueryInput = document.getElementById('sqlQueryInput');
+    const btnExecuteSql = document.getElementById('btnExecuteSql');
+    const sqlResultContainer = document.getElementById('sqlResultContainer');
+    const sqlResultEmptyState = document.getElementById('sqlResultEmptyState');
+    const sqlResultTable = document.getElementById('sqlResultTable');
+    const sqlResultThead = document.getElementById('sqlResultThead');
+    const sqlResultTbody = document.getElementById('sqlResultTbody');
+    const sqlExecutionTime = document.getElementById('sqlExecutionTime');
+    const rowModal = document.getElementById('rowModal');
+    const rowModalTitle = document.getElementById('rowModalTitle');
+    const rowForm = document.getElementById('rowForm');
+    const rowFormFields = document.getElementById('rowFormFields');
+    const btnCloseRowModal = document.getElementById('btnCloseRowModal');
+    const btnCancelRowModal = document.getElementById('btnCancelRowModal');
+    const btnSaveRowModal = document.getElementById('btnSaveRowModal');
+    const btnExportFullSql = document.getElementById('btnExportFullSql');
+    const btnFullDbBackup = document.getElementById('btnFullDbBackup');
+    const btnExportTableSql = document.getElementById('btnExportTableSql');
+    const btnExportTableCsv = document.getElementById('btnExportTableCsv');
+    const exportTableLabel = document.getElementById('exportTableLabel');
+    const toastContainer = document.getElementById('toastContainer');
+    const btnGlobalSql = document.getElementById('btnGlobalSql');
+    const btnFullscreenToggle = document.getElementById('btnFullscreenToggle');
+    const fsToggleIcon = document.getElementById('fsToggleIcon');
+    const fsToggleText = document.getElementById('fsToggleText');
+    const dbeRoot = document.querySelector('.dbe-root');
+
+    // Toast
+    function showToast(msg, type = 'success') {
+        const toast = document.createElement('div');
+        toast.className = 'dbe-toast-item';
+        toast.textContent = msg;
+        toastContainer.appendChild(toast);
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transition = 'opacity 0.25s ease';
+            setTimeout(() => toast.remove(), 250);
+        }, 2800);
+    }
+
+    // CSRF
+    function getCsrfToken() {
+        const cookieValue = document.cookie
+            .split('; ')
+            .find(row => row.startsWith('csrftoken='))
+            ?.split('=')[1];
+        return cookieValue || '{{ csrf_token }}';
+    }
+
+    // Safe API Fetcher
+    async function fetchApi(url, options = {}) {
+        options.headers = {
+            'X-Requested-With': 'XMLHttpRequest',
+            ...(options.headers || {})
+        };
+        const res = await fetch(url, options);
+        const contentType = res.headers.get('content-type') || '';
+        
+        let data;
+        if (contentType.includes('application/json')) {
+            try {
+                data = await res.json();
+            } catch (e) {
+                throw new Error('Gagal memproses JSON dari server.');
+            }
+        } else {
+            const text = await res.text();
+            if (res.status === 403 || text.includes('PermissionDenied') || text.includes('Forbidden')) {
+                throw new Error('Akses Ditolak (403): Hanya Superuser / Staff yang diizinkan.');
+            }
+            if (res.status === 401 || text.includes('login')) {
+                throw new Error('Sesi Anda telah kedaluwarsa. Silakan refresh halaman atau login kembali.');
+            }
+            throw new Error(`Server Error (${res.status}): ${text.substring(0, 100)}`);
+        }
+
+        if (!res.ok || (data && data.success === false)) {
+            throw new Error((data && data.error) || `HTTP Error ${res.status}`);
+        }
+        return data;
+    }
+
+    // Fullscreen Toggle
+    function syncFullscreenUI(isFullscreen) {
+        if (fsToggleIcon && fsToggleText) {
+            fsToggleIcon.textContent = isFullscreen ? 'fullscreen_exit' : 'fullscreen';
+            fsToggleText.textContent = isFullscreen ? 'Exit Full' : 'Fullscreen';
+        }
+    }
+
+    if (btnFullscreenToggle && dbeRoot) {
+        btnFullscreenToggle.addEventListener('click', () => {
+            const isCurrentlyFs = dbeRoot.classList.contains('is-fullscreen') || !!document.fullscreenElement;
+            
+            if (!isCurrentlyFs) {
+                if (document.fullscreenEnabled && dbeRoot.requestFullscreen) {
+                    dbeRoot.requestFullscreen().catch(() => {
+                        dbeRoot.classList.add('is-fullscreen');
+                        syncFullscreenUI(true);
+                    });
+                } else {
+                    dbeRoot.classList.add('is-fullscreen');
+                    syncFullscreenUI(true);
+                }
+            } else {
+                if (document.fullscreenElement && document.exitFullscreen) {
+                    document.exitFullscreen().catch(() => {});
+                }
+                dbeRoot.classList.remove('is-fullscreen');
+                syncFullscreenUI(false);
+            }
+        });
+
+        document.addEventListener('fullscreenchange', () => {
+            const isFs = !!document.fullscreenElement;
+            dbeRoot.classList.toggle('is-fullscreen', isFs);
+            syncFullscreenUI(isFs);
+        });
+    }
+
+    // Tabs
+    const navTabs = document.querySelectorAll('.nav-tab');
+    navTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            navTabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            const targetId = tab.dataset.tab;
+            document.querySelectorAll('.tab-pane').forEach(pane => {
+                if (pane.id === targetId) {
+                    pane.classList.remove('hidden');
+                } else {
+                    pane.classList.add('hidden');
+                }
+            });
+            if (targetId === 'tabStructure' && activeTable) {
+                loadTableStructure(activeTable);
+            }
+        });
+    });
+
+    btnGlobalSql.addEventListener('click', () => {
+        document.querySelector('.nav-tab[data-tab="tabSql"]').click();
+        sqlQueryInput.focus();
+    });
+
+    // Copy Name
+    btnCopyTableName.addEventListener('click', () => {
+        if (activeTable) {
+            navigator.clipboard.writeText(activeTable);
+            showToast(`Table name '${activeTable}' copied.`);
+        }
+    });
+
+    // Load Tables List
+    async function loadTables() {
+        tableListContainer.innerHTML = `<div class="dbe-state-text">Loading tables...</div>`;
+        try {
+            const data = await fetchApi(`${API_URL}?db=${activeDb}&action=list_tables`);
+
+            allTablesList = data.tables;
+            tableCountBadge.textContent = data.total_tables;
+            statTotalTables.textContent = data.total_tables;
+            statTotalRows.textContent = (data.total_rows || 0).toLocaleString();
+            statTotalSize.textContent = (data.total_size_kb || 0).toLocaleString() + ' KB';
+
+            renderTableList();
+
+            if (!activeTable && allTablesList.length > 0) {
+                selectTable(allTablesList[0].name);
+            }
+        } catch (err) {
+            tableListContainer.innerHTML = `<div style="color: #ef4444; padding: 8px; font-size: 11px;">Error: ${err.message}</div>`;
+        }
+    }
+
+    function renderTableList() {
+        const query = tableFilterInput.value.toLowerCase().trim();
+        btnClearTableFilter.classList.toggle('hidden', !query);
+
+        let filtered = allTablesList.filter(tbl => {
+            const matchName = tbl.name.toLowerCase().includes(query);
+            const matchPrefix = !activePrefixFilter || tbl.name.toLowerCase().startsWith(activePrefixFilter);
+            return matchName && matchPrefix;
+        });
+
+        tableCountBadge.textContent = filtered.length;
+
+        if (filtered.length === 0) {
+            tableListContainer.innerHTML = `<div class="dbe-state-text">No matching tables</div>`;
+            return;
+        }
+
+        let html = '';
+        filtered.forEach(tbl => {
+            const isActive = tbl.name === activeTable;
+            html += `
+                <button class="table-item ${isActive ? 'active' : ''}" data-table="${tbl.name}">
+                    <span class="table-item-name" title="${tbl.name}">${escapeHtml(tbl.name)}</span>
+                    <span class="table-item-badge">${(tbl.row_count || 0).toLocaleString()}</span>
+                </button>
+            `;
+        });
+        tableListContainer.innerHTML = html;
+
+        tableListContainer.querySelectorAll('.table-item').forEach(btn => {
+            btn.addEventListener('click', () => {
+                selectTable(btn.dataset.table);
+            });
+        });
+    }
+
+    // Filter Chips
+    document.querySelectorAll('.tbl-filter-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+            document.querySelectorAll('.tbl-filter-chip').forEach(c => c.classList.remove('active-chip'));
+            chip.classList.add('active-chip');
+            activePrefixFilter = chip.dataset.prefix.toLowerCase();
+            renderTableList();
+        });
+    });
+
+    tableFilterInput.addEventListener('input', renderTableList);
+    btnClearTableFilter.addEventListener('click', () => {
+        tableFilterInput.value = '';
+        renderTableList();
+    });
+
+    // Select Active Table
+    function selectTable(tableName) {
+        activeTable = tableName;
+        activeTableTitle.textContent = tableName;
+        btnCopyTableName.classList.remove('hidden');
+        activeTableMetaPills.classList.remove('hidden');
+        btnInsertRow.disabled = false;
+        btnExportTableSql.disabled = false;
+        btnExportTableCsv.disabled = false;
+        exportTableLabel.textContent = `Export Table: ${tableName}`;
+
+        renderTableList();
+        currentPage = 1;
+        currentSearch = '';
+        dataSearchInput.value = '';
+        currentSortCol = '';
+        currentSortDir = 'ASC';
+
+        const activeTabEl = document.querySelector('.nav-tab.active');
+        if (activeTabEl && activeTabEl.dataset.tab === 'tabStructure') {
+            loadTableStructure(tableName);
+        } else {
+            loadTableData();
+        }
+    }
+
+    // Load Data
+    async function loadTableData() {
+        if (!activeTable) return;
+        dataTbody.innerHTML = `<tr><td colspan="50" class="dbe-empty-state">Loading rows...</td></tr>`;
+        
+        try {
+            const url = `${API_URL}?db=${activeDb}&action=get_table_data&table=${activeTable}&page=${currentPage}&page_size=${currentPageSize}&search=${encodeURIComponent(currentSearch)}&sort_col=${encodeURIComponent(currentSortCol)}&sort_dir=${currentSortDir}`;
+            const data = await fetchApi(url);
+
+            currentColumns = data.columns || [];
+            currentPkCols = data.pk_cols || [];
+            currentRows = data.rows || [];
+            tableRowMetaBadge.textContent = `${data.total_rows.toLocaleString()} rows`;
+
+            renderDataThead(currentColumns, currentPkCols);
+            renderDataTbody(currentColumns, currentRows, currentPkCols);
+            renderPagination(data.total_rows, data.page, data.page_size, data.total_pages);
+        } catch (err) {
+            dataTbody.innerHTML = `<tr><td colspan="50" style="color: #ef4444; padding: 20px; text-align: center;">Error loading data: ${err.message}</td></tr>`;
+        }
+    }
+
+    function renderDataThead(columns, pkCols) {
+        let html = '<tr>';
+        html += '<th style="width: 40px; text-align: center;">#</th>';
+        html += '<th style="width: 80px; text-align: center;">Actions</th>';
+        columns.forEach(col => {
+            const isPk = pkCols.includes(col);
+            const isSorted = currentSortCol === col;
+            const sortIcon = isSorted ? (currentSortDir === 'ASC' ? ' ↑' : ' ↓') : '';
+            html += `
+                <th class="cursor-pointer select-none" data-col="${col}" style="cursor: pointer;">
+                    <span>${col}${isPk ? ' (PK)' : ''}${sortIcon}</span>
+                </th>
+            `;
+        });
+        html += '</tr>';
+        dataThead.innerHTML = html;
+
+        dataThead.querySelectorAll('th[data-col]').forEach(th => {
+            th.addEventListener('click', () => {
+                const col = th.dataset.col;
+                if (currentSortCol === col) {
+                    currentSortDir = currentSortDir === 'ASC' ? 'DESC' : 'ASC';
+                } else {
+                    currentSortCol = col;
+                    currentSortDir = 'ASC';
+                }
+                loadTableData();
+            });
+        });
+    }
+
+    function renderDataTbody(columns, rows, pkCols) {
+        if (rows.length === 0) {
+            dataTbody.innerHTML = `<tr><td colspan="${columns.length + 2}" class="dbe-empty-state">No rows found in this table.</td></tr>`;
+            return;
+        }
+
+        let html = '';
+        rows.forEach((row, idx) => {
+            const rowNum = (currentPage - 1) * currentPageSize + idx + 1;
+            html += '<tr>';
+            html += `<td style="text-align: center; color: var(--dbe-text-subtle);">${rowNum}</td>`;
+            html += `
+                <td style="text-align: center;">
+                    <div class="dbe-actions-cell">
+                        <button class="dbe-row-btn btn-edit-row" data-row-idx="${idx}">Edit</button>
+                        <button class="dbe-row-btn dbe-row-btn-del btn-del-row" data-row-idx="${idx}">Del</button>
+                    </div>
+                </td>
+            `;
+
+            columns.forEach(col => {
+                const val = row[col];
+                let displayVal = '';
+                if (val === null) {
+                    displayVal = '<span class="dbe-null-val">NULL</span>';
+                } else if (typeof val === 'boolean') {
+                    displayVal = val ? 'TRUE' : 'FALSE';
+                } else {
+                    displayVal = escapeHtml(String(val));
+                }
+                html += `<td>${displayVal}</td>`;
+            });
+            html += '</tr>';
+        });
+
+        dataTbody.innerHTML = html;
+
+        dataTbody.querySelectorAll('.btn-edit-row').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const idx = parseInt(btn.dataset.rowIdx);
+                openEditModal(rows[idx]);
+            });
+        });
+
+        dataTbody.querySelectorAll('.btn-del-row').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const idx = parseInt(btn.dataset.rowIdx);
+                deleteRow(rows[idx]);
+            });
+        });
+    }
+
+    function renderPagination(totalRows, page, pageSize, totalPages) {
+        const start = (page - 1) * pageSize + (totalRows > 0 ? 1 : 0);
+        const end = Math.min(page * pageSize, totalRows);
+        paginationInfo.textContent = `Showing ${start.toLocaleString()} - ${end.toLocaleString()} of ${totalRows.toLocaleString()} rows`;
+        pageNumberDisplay.textContent = `${page} / ${totalPages || 1}`;
+
+        btnPrevPage.disabled = (page <= 1);
+        btnNextPage.disabled = (page >= totalPages);
+    }
+
+    // Load Structure
+    async function loadTableStructure(tableName) {
+        structureTbody.innerHTML = `<tr><td colspan="7" class="dbe-empty-state">Loading schema...</td></tr>`;
+        try {
+            const data = await fetchApi(`${API_URL}?db=${activeDb}&action=get_table_schema&table=${tableName}`);
+
+            structureTbody.innerHTML = '';
+            data.columns.forEach((col, idx) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="text-align: center; color: var(--dbe-text-subtle);">${idx + 1}</td>
+                    <td style="font-weight: 600;">${col.name}</td>
+                    <td><code>${col.type}</code></td>
+                    <td>${col.null}</td>
+                    <td>${col.key || '-'}</td>
+                    <td>${col.default !== null ? escapeHtml(String(col.default)) : '<span class="dbe-null-val">NULL</span>'}</td>
+                    <td style="color: var(--dbe-text-muted);">${col.extra || '-'}</td>
+                `;
+                structureTbody.appendChild(tr);
+            });
+        } catch (err) {
+            structureTbody.innerHTML = `<tr><td colspan="7" style="color: #ef4444; padding: 16px; text-align: center;">Error loading schema: ${err.message}</td></tr>`;
+        }
+    }
+
+    // Modal Insert & Edit
+    async function openInsertModal() {
+        if (!activeTable) return;
+        editMode = false;
+        currentEditPk = {};
+        rowModalTitle.textContent = `Insert Record into ${activeTable}`;
+        btnSaveRowModal.textContent = `Save Record`;
+
+        rowFormFields.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 20px; color: var(--dbe-text-muted);">Loading columns...</div>';
+        rowModal.classList.remove('hidden');
+
+        try {
+            const data = await fetchApi(`${API_URL}?db=${activeDb}&action=get_table_schema&table=${activeTable}`);
+
+            rowFormFields.innerHTML = '';
+            data.columns.forEach(col => {
+                const fieldDiv = document.createElement('div');
+                fieldDiv.className = 'dbe-form-row';
+                const isAuto = col.extra && col.extra.includes('auto_increment');
+                const colTypeLower = (col.type || '').toLowerCase();
+                const isBool = colTypeLower === 'tinyint(1)' || colTypeLower === 'bool' || colTypeLower === 'boolean';
+
+                let inputHtml = '';
+                if (isBool) {
+                    const isDefOne = (col.default === '1' || col.default === 1);
+                    inputHtml = `
+                        <select name="${col.name}" class="dbe-input-select" style="width: 100%;">
+                            <option value="1" ${isDefOne ? 'selected' : ''}>1 - True / Active / Yes</option>
+                            <option value="0" ${!isDefOne ? 'selected' : ''}>0 - False / Inactive / No</option>
+                        </select>
+                    `;
+                } else if (colTypeLower.includes('text') || colTypeLower.includes('json')) {
+                    inputHtml = `<textarea name="${col.name}" rows="3" class="dbe-form-input custom-scroll" style="font-family: var(--dbe-font-mono); font-size: 11px;"></textarea>`;
+                } else {
+                    inputHtml = `<input type="text" name="${col.name}" placeholder="${isAuto ? '(Auto-Increment)' : ''}" ${isAuto ? 'disabled' : ''} class="dbe-form-input">`;
+                }
+
+                fieldDiv.innerHTML = `
+                    <label class="dbe-form-label">
+                        <span>${col.name} ${col.is_pk ? '(PK)' : ''}</span>
+                        <span class="dbe-form-type">${col.type}</span>
+                    </label>
+                    ${inputHtml}
+                `;
+                rowFormFields.appendChild(fieldDiv);
+            });
+        } catch (err) {
+            rowFormFields.innerHTML = `<div style="grid-column: 1 / -1; color: #ef4444;">Error: ${err.message}</div>`;
+        }
+    }
+
+    async function openEditModal(row) {
+        if (!activeTable) return;
+        editMode = true;
+        currentEditPk = {};
+        rowModalTitle.textContent = `Edit Record in ${activeTable}`;
+        btnSaveRowModal.textContent = `Save Changes`;
+
+        rowFormFields.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 20px; color: var(--dbe-text-muted);">Loading record...</div>';
+        rowModal.classList.remove('hidden');
+
+        try {
+            const data = await fetchApi(`${API_URL}?db=${activeDb}&action=get_table_schema&table=${activeTable}`);
+
+            const pkCols = data.columns.filter(c => c.is_pk).map(c => c.name);
+            currentPkCols = pkCols.length > 0 ? pkCols : currentPkCols;
+            currentPkCols.forEach(pk => currentEditPk[pk] = row[pk]);
+
+            rowFormFields.innerHTML = '';
+            data.columns.forEach(col => {
+                const val = row[col.name];
+                const isPk = col.is_pk;
+                const fieldDiv = document.createElement('div');
+                fieldDiv.className = 'dbe-form-row';
+                const colTypeLower = (col.type || '').toLowerCase();
+                const isBool = colTypeLower === 'tinyint(1)' || colTypeLower === 'bool' || colTypeLower === 'boolean' || col.name.startsWith('is_');
+
+                let inputHtml = '';
+                let helperHtml = '';
+
+                if (col.name === 'password') {
+                    inputHtml = `<input type="password" name="${col.name}" value="" placeholder="(Kosongkan jika tidak ingin mengubah password / SSO)" class="dbe-form-input">`;
+                    helperHtml = `<div style="font-size: 11px; color: var(--dbe-text-muted); margin-top: 3px;">Biarkan kosong untuk mempertahankan password lama / SSO login user.</div>`;
+                } else if (isBool) {
+                    const isTrue = (val === 1 || val === '1' || val === true || val === 'true');
+                    inputHtml = `
+                        <select name="${col.name}" class="dbe-input-select" style="width: 100%;">
+                            <option value="1" ${isTrue ? 'selected' : ''}>1 - True / Active / Yes</option>
+                            <option value="0" ${!isTrue ? 'selected' : ''}>0 - False / Inactive / No</option>
+                        </select>
+                    `;
+                } else if (colTypeLower.includes('text') || colTypeLower.includes('json')) {
+                    inputHtml = `<textarea name="${col.name}" rows="3" class="dbe-form-input custom-scroll" style="font-family: var(--dbe-font-mono); font-size: 11px;">${val !== null && val !== undefined ? escapeHtml(String(val)) : ''}</textarea>`;
+                } else {
+                    inputHtml = `<input type="text" name="${col.name}" value="${val !== null && val !== undefined ? escapeHtml(String(val)) : ''}" ${isPk ? 'readonly style="opacity: 0.7; background: var(--dbe-surface-subtle);"' : ''} class="dbe-form-input">`;
+                }
+
+                fieldDiv.innerHTML = `
+                    <label class="dbe-form-label">
+                        <span>${col.name} ${isPk ? '(PK)' : ''}</span>
+                        <span class="dbe-form-type">${col.type}</span>
+                    </label>
+                    ${inputHtml}
+                    ${helperHtml}
+                `;
+                rowFormFields.appendChild(fieldDiv);
+            });
+        } catch (err) {
+            rowFormFields.innerHTML = `<div style="grid-column: 1 / -1; color: #ef4444;">Error: ${err.message}</div>`;
+        }
+    }
+
+    function closeRowModal() {
+        rowModal.classList.add('hidden');
+    }
+
+    btnCloseRowModal.addEventListener('click', closeRowModal);
+    btnCancelRowModal.addEventListener('click', closeRowModal);
+    btnInsertRow.addEventListener('click', openInsertModal);
+
+    rowModal.addEventListener('click', (e) => {
+        if (e.target === rowModal) closeRowModal();
+    });
+
+    btnSaveRowModal.addEventListener('click', async () => {
+        const formData = {};
+        rowFormFields.querySelectorAll('input[name], select[name], textarea[name]').forEach(inp => {
+            if (!inp.disabled) formData[inp.name] = inp.value;
+        });
+
+        btnSaveRowModal.disabled = true;
+        btnSaveRowModal.textContent = 'Saving...';
+
+        try {
+            const actionType = editMode ? 'update_row' : 'insert_row';
+            const payload = {
+                table: activeTable,
+                data: formData,
+            };
+            if (editMode) payload.pk = currentEditPk;
+
+            const data = await fetchApi(`${API_URL}?db=${activeDb}&action=${actionType}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCsrfToken(),
+                },
+                body: JSON.stringify(payload),
+            });
+
+            showToast(data.message || 'Saved successfully.');
+            closeRowModal();
+            loadTableData();
+        } catch (err) {
+            alert('Error saving record: ' + err.message);
+        } finally {
+            btnSaveRowModal.disabled = false;
+            btnSaveRowModal.textContent = 'Save Changes';
+        }
+    });
+
+    async function deleteRow(row) {
+        if (!currentPkCols.length) {
+            alert('This table does not have a primary key defined.');
+            return;
+        }
+
+        const pkSummary = currentPkCols.map(pk => `${pk}=${row[pk]}`).join(', ');
+        if (!confirm(`Are you sure you want to delete row [${pkSummary}]?`)) {
+            return;
+        }
+
+        const pkData = {};
+        currentPkCols.forEach(pk => pkData[pk] = row[pk]);
+
+        try {
+            const data = await fetchApi(`${API_URL}?db=${activeDb}&action=delete_row`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCsrfToken(),
+                },
+                body: JSON.stringify({
+                    table: activeTable,
+                    pk: pkData,
+                }),
+            });
+
+            showToast(data.message || 'Row deleted.');
+            loadTableData();
+        } catch (err) {
+            alert('Error deleting row: ' + err.message);
+        }
+    }
+
+    // SQL Runner
+    btnExecuteSql.addEventListener('click', executeSqlQuery);
+    sqlQueryInput.addEventListener('keydown', (e) => {
+        if (e.ctrlKey && e.key === 'Enter') {
+            executeSqlQuery();
+        }
+    });
+
+    async function executeSqlQuery() {
+        const query = sqlQueryInput.value.trim();
+        if (!query) return;
+
+        btnExecuteSql.disabled = true;
+        btnExecuteSql.textContent = 'Executing...';
+        sqlResultEmptyState.textContent = 'Executing query...';
+        sqlResultEmptyState.classList.remove('hidden');
+        sqlResultTable.classList.add('hidden');
+        sqlExecutionTime.textContent = '';
+
+        try {
+            const data = await fetchApi(`${API_URL}?db=${activeDb}&action=run_sql`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCsrfToken(),
+                },
+                body: JSON.stringify({ query }),
+            });
+
+            sqlExecutionTime.textContent = `${data.elapsed_ms} ms`;
+
+            if (data.is_select) {
+                sqlResultEmptyState.classList.add('hidden');
+                sqlResultTable.classList.remove('hidden');
+
+                let thead = '<tr>';
+                data.columns.forEach(col => thead += `<th>${col}</th>`);
+                thead += '</tr>';
+                sqlResultThead.innerHTML = thead;
+
+                let tbody = '';
+                data.rows.forEach(row => {
+                    tbody += '<tr>';
+                    data.columns.forEach(col => {
+                        const val = row[col];
+                        tbody += `<td>${val !== null ? escapeHtml(String(val)) : '<span class="dbe-null-val">NULL</span>'}</td>`;
+                    });
+                    tbody += '</tr>';
+                });
+                sqlResultTbody.innerHTML = tbody || '<tr><td colspan="50" class="dbe-empty-state">Query returned 0 rows.</td></tr>';
+                showToast(`Query completed (${data.row_count} rows).`);
+            } else {
+                sqlResultEmptyState.textContent = data.message;
+                showToast(data.message);
+            }
+        } catch (err) {
+            sqlResultEmptyState.textContent = 'SQL Error: ' + err.message;
+            sqlResultEmptyState.style.color = '#ef4444';
+        } finally {
+            btnExecuteSql.disabled = false;
+            btnExecuteSql.textContent = 'Run Query';
+        }
+    }
+
+    // Snippets
+    document.querySelectorAll('.sql-snippet-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const snip = btn.dataset.snip.replace('{TABLE}', activeTable || 'leaderboard_member');
+            sqlQueryInput.value = snip;
+            sqlQueryInput.focus();
+        });
+    });
+
+    // Backup & Export
+    function downloadBackup(type, table = '') {
+        const url = `${API_URL}?db=${activeDb}&action=${type}&table=${encodeURIComponent(table)}`;
+        window.open(url, '_blank');
+        showToast('Export download started.');
+    }
+
+    btnExportFullSql.addEventListener('click', () => downloadBackup('export_sql'));
+    btnFullDbBackup.addEventListener('click', () => downloadBackup('export_sql'));
+    btnExportTableSql.addEventListener('click', () => downloadBackup('export_sql', activeTable));
+    btnExportTableCsv.addEventListener('click', () => downloadBackup('export_csv', activeTable));
+
+    // Search & Paging
+    let searchDebounceTimer;
+    dataSearchInput.addEventListener('input', (e) => {
+        clearTimeout(searchDebounceTimer);
+        searchDebounceTimer = setTimeout(() => {
+            currentSearch = e.target.value.trim();
+            currentPage = 1;
+            loadTableData();
+        }, 300);
+    });
+
+    pageSizeSelect.addEventListener('change', (e) => {
+        currentPageSize = parseInt(e.target.value);
+        currentPage = 1;
+        loadTableData();
+    });
+
+    btnPrevPage.addEventListener('click', () => {
+        if (currentPage > 1) {
+            currentPage--;
+            loadTableData();
+        }
+    });
+
+    btnNextPage.addEventListener('click', () => {
+        currentPage++;
+        loadTableData();
+    });
+
+    btnRefreshData.addEventListener('click', loadTableData);
+    btnRefreshTables.addEventListener('click', loadTables);
+
+    dbSelect.addEventListener('change', (e) => {
+        activeDb = e.target.value;
+        activeTable = '';
+        activeTableTitle.textContent = 'Select a table';
+        btnCopyTableName.classList.add('hidden');
+        activeTableMetaPills.classList.add('hidden');
+        loadTables();
+    });
+
+    // Theme Toggle
+    const btnThemeToggle = document.getElementById('btnThemeToggle');
+    const themeToggleIcon = document.getElementById('themeToggleIcon');
+    const themeToggleText = document.getElementById('themeToggleText');
+
+    function syncThemeUI(isDark) {
+        if (themeToggleIcon && themeToggleText) {
+            themeToggleIcon.textContent = isDark ? 'light_mode' : 'dark_mode';
+            themeToggleText.textContent = isDark ? 'Light' : 'Dark';
+        }
+    }
+
+    function applyTheme(theme) {
+        const isDark = (theme === 'dark') || (theme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        if (isDark) {
+            document.documentElement.classList.add('dark');
+            document.documentElement.dataset.theme = 'dark';
+        } else {
+            document.documentElement.classList.remove('dark');
+            document.documentElement.dataset.theme = 'light';
+        }
+        syncThemeUI(isDark);
+        localStorage.setItem('theme', isDark ? 'dark' : 'light');
+    }
+
+    const currentIsDark = document.documentElement.classList.contains('dark') || 
+                          localStorage.getItem('theme') === 'dark' || 
+                          (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    applyTheme(currentIsDark ? 'dark' : 'light');
+
+    if (btnThemeToggle) {
+        btnThemeToggle.addEventListener('click', () => {
+            const isCurrentlyDark = document.documentElement.classList.contains('dark');
+            applyTheme(isCurrentlyDark ? 'light' : 'dark');
+        });
+    }
+
+    function escapeHtml(text) {
+        return text
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    // Init
+    loadTables();
+});
+</script>
+{% endblock %}

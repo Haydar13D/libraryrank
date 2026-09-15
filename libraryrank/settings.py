@@ -361,6 +361,11 @@ UNFOLD = {
                 "separator": True,
                 "items": [
                     {
+                        "title": "Database Explorer (Lite)",
+                        "icon": "database",
+                        "link": reverse_lazy("db_explorer_dashboard"),
+                    },
+                    {
                         "title": "API Keys",
                         "icon": "vpn_key",
                         "link": reverse_lazy("admin:leaderboard_apikey_changelist"),

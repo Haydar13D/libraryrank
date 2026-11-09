@@ -238,31 +238,33 @@ def get_live_members(date_from, date_to, search_q=None):
     # Manual Points from Transactions
     try:
         from django.db.models import Sum, Count
-        from .models import RedemptionClaim
         pt_qs = PointTransaction.objects.filter(created_at__gte=date_from).values('cardnumber', 'transaction_type').annotate(total=Sum('amount'), cnt=Count('id'))
-        local_points = {}
+        local_earned = {}
+        local_redeemed = {}
         seminar_counts = {}
         for item in pt_qs:
-            cnum = item['cardnumber']
-            if not cnum: continue
+            cnum = str(item['cardnumber'] or '').strip().upper()
+            if not cnum:
+                continue
             
-            if cnum not in local_points:
-                local_points[cnum] = 0
-            local_points[cnum] += item['total'] or 0
+            amt = item['total'] or 0
+            ttype = item['transaction_type']
             
-            if item['transaction_type'] == 'seminar':
-                seminar_counts[cnum] = item['cnt']
+            if cnum not in local_earned:
+                local_earned[cnum] = 0
+            if cnum not in local_redeemed:
+                local_redeemed[cnum] = 0
                 
-        # Kurangi poin untuk klaim yang masih pending (Held points)
-        pending_qs = RedemptionClaim.objects.filter(status='pending').values('member__member_id').annotate(total=Sum('reward__points_cost'))
-        for item in pending_qs:
-            cnum = item['member__member_id']
-            if not cnum: continue
-            if cnum not in local_points:
-                local_points[cnum] = 0
-            local_points[cnum] -= item['total'] or 0
+            if ttype == 'redeem' or amt < 0:
+                local_redeemed[cnum] += abs(amt)
+            else:
+                local_earned[cnum] += amt
+            
+            if ttype == 'seminar':
+                seminar_counts[cnum] = item['cnt']
     except Exception:
-        local_points = {}
+        local_earned = {}
+        local_redeemed = {}
         seminar_counts = {}
     
     for row in rows:
@@ -326,11 +328,15 @@ def get_live_members(date_from, date_to, search_q=None):
         
         visit_points = v_cnt * v_mult
         borrow_points = b_cnt * b_mult
-        local_pt = local_points.get(str(card), 0)
-        total_p = visit_points + borrow_points + local_pt
+        earned_pt = local_earned.get(card_str, 0)
+        redeemed_pt = local_redeemed.get(card_str, 0)
+
+        # Model B1: Gross XP (Klasemen) vs Available XP (Saldo Belanja Siap Ditukar)
+        total_p = visit_points + borrow_points + earned_pt
+        available_p = max(0, total_p - redeemed_pt)
 
         # Only include active people (with any library activity or local points), BUT always include staff and lecturer!
-        if v_cnt == 0 and b_cnt == 0 and sat_v_cnt == 0 and local_pt == 0 and not search_q:
+        if v_cnt == 0 and b_cnt == 0 and sat_v_cnt == 0 and earned_pt == 0 and not search_q:
             if role == 'student':
                 continue
 
@@ -386,6 +392,8 @@ def get_live_members(date_from, date_to, search_q=None):
             'badges': badges,
             'level': member_level,
             'total_p': total_p,
+            'available_p': available_p,
+            'redeemed_p': redeemed_pt,
             'v_cnt': v_cnt,
             'b_cnt': b_cnt,
             's_cnt': s_cnt

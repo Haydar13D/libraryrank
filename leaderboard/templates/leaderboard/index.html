@@ -159,22 +159,54 @@
 
 <!-- CONTROLS TOOLBAR -->
 <div class="controls-bar">
-  <div class="date-controls">
-    <div class="date-input-wrap">
-      <span>Dari:</span>
-      <input type="date" id="dateFrom" value="{{ date_from }}">
+  <div class="preset-controls-wrap">
+    <div class="period-presets" id="periodPresets">
+      <button class="preset-pill active" data-preset="semester" data-from="{{ date_from }}" data-to="{{ date_to }}" title="Klasemen periode semester aktif saat ini">
+        <svg class="svg-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="8" r="6"></circle>
+          <path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"></path>
+        </svg>
+        Semester Ini
+      </button>
+      <button class="preset-pill" data-preset="month" title="Klasemen 30 hari / bulan kalender aktif">
+        <svg class="svg-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+          <line x1="16" y1="2" x2="16" y2="6"></line>
+          <line x1="8" y1="2" x2="8" y2="6"></line>
+          <line x1="3" y1="10" x2="21" y2="10"></line>
+        </svg>
+        Bulan Ini
+      </button>
+      <button class="preset-pill" data-preset="alltime" data-from="2020-01-01" data-to="{{ date_to }}" title="Akumulasi seluruh poin pemustaka">
+        <svg class="svg-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="2" y1="12" x2="22" y2="12"></line>
+          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1 4-10z"></path>
+        </svg>
+        Sepanjang Masa
+      </button>
+      <button class="preset-pill custom-toggle" id="btnToggleCustomDate" title="Pilih rentang tanggal khusus untuk keperluan tertentu">
+        <svg class="svg-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+        </svg>
+        Kustom
+      </button>
     </div>
-    <div class="date-input-wrap">
-      <span>Sampai:</span>
-      <input type="date" id="dateTo" value="{{ date_to }}">
+
+    <!-- Collapsible Custom Date Drawer -->
+    <div class="custom-date-drawer" id="customDateDrawer" style="display: none;">
+      <div class="date-input-wrap">
+        <span>Dari:</span>
+        <input type="date" id="dateFrom" value="{{ date_from }}">
+      </div>
+      <div class="date-input-wrap">
+        <span>Sampai:</span>
+        <input type="date" id="dateTo" value="{{ date_to }}">
+      </div>
+      <button class="btn-filter" id="btnFilter" title="Terapkan Filter Tanggal">
+        Terapkan
+      </button>
     </div>
-    <button class="btn-filter" id="btnFilter" title="Terapkan Filter Tanggal">
-      <svg class="svg-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-        stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
-      </svg>
-      Terapkan
-    </button>
   </div>
 
   <div style="display: flex; align-items: center; gap: 8px;">

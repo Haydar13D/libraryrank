@@ -11,9 +11,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 env = environ.Env(DEBUG=(bool, False))
 environ.Env.read_env(BASE_DIR / '.env')
 
-DEBUG = env.bool('DEBUG', default=True)
-SECRET_KEY   = env('SECRET_KEY', default='django-insecure-change-me')
-ALLOWED_HOSTS = ['*']
+DEBUG = env.bool('DEBUG', default=False)
+SECRET_KEY = env('SECRET_KEY', default='django-insecure-change-me')
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['libraryrank.ums.ac.id', '127.0.0.1', 'localhost', 'testserver'])
 
 CSRF_TRUSTED_ORIGINS = [
     'https://libraryrank.ums.ac.id:8002',
@@ -128,8 +128,7 @@ DATABASES = {
 }
 
 # Route all Django ORM operations to 'default'.
-# 'koha' is only accessed via raw SQL in the sync command.
-DATABASE_ROUTERS = ['libraryrank.db_routers.KohaReadOnlyRouter']
+# 'koha' is only accessed via raw SQL in the sync command / koha_utils.
 
 # ─────────────────────────────────────────────────────────────
 # CAS SSO (UMS)
@@ -145,7 +144,7 @@ elif cas_ver_raw.startswith('3'):
 else:
     CAS_VERSION = cas_ver_raw
 
-CAS_DISABLE_SSL_VALIDATION = env.bool('CAS_DISABLE_SSL_VALIDATION', default=True)
+CAS_DISABLE_SSL_VALIDATION = env.bool('CAS_DISABLE_SSL_VALIDATION', default=False)
 
 if CAS_PORT == 443:
     CAS_SERVER_URL = f"https://{CAS_HOST}{CAS_CONTEXT}/"
@@ -243,10 +242,18 @@ AUTH_PASSWORD_VALIDATORS = [
 from django.templatetags.static import static
 from django.urls import reverse_lazy
 
+UNFOLD_LOGO = lambda request: static('img/logo4.png')
+
 UNFOLD = {
     'SITE_TITLE': 'LibraryRank Admin',
     'SITE_HEADER': 'LibraryRank Admin',
     'SITE_SYMBOL': 'speed', # Material icon
+    'SITE_FAVICONS': [
+        {'rel': 'icon', 'sizes': '32x32', 'type': 'image/png', 'href': UNFOLD_LOGO},
+        {'rel': 'apple-touch-icon', 'sizes': '180x180', 'type': 'image/png', 'href': UNFOLD_LOGO},
+    ],
+    'SITE_ICON': {'light': UNFOLD_LOGO, 'dark': UNFOLD_LOGO},
+    'SITE_LOGO': {'light': UNFOLD_LOGO, 'dark': UNFOLD_LOGO},
     'COLORS': {
         'primary': {
             '50': '#ebf8f8',
@@ -360,11 +367,6 @@ UNFOLD = {
                 "title": "Sistem & Integrasi API",
                 "separator": True,
                 "items": [
-                    {
-                        "title": "Database Explorer (Lite)",
-                        "icon": "database",
-                        "link": reverse_lazy("db_explorer_dashboard"),
-                    },
                     {
                         "title": "API Keys",
                         "icon": "vpn_key",

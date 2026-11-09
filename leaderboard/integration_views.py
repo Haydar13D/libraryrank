@@ -32,8 +32,10 @@ def integration_member_detail(request, member_id):
             'role': detail['role'],
             'faculty': detail.get('faculty', ''),
             'department': detail.get('department', ''),
-            'total_xp': detail['visits_total'],
-            'total_books': detail['books_total'],
+            'total_xp': detail.get('total_p', detail.get('visits_total', 0)),
+            'available_xp': detail.get('available_p', detail.get('total_p', 0)),
+            'redeemed_xp': detail.get('redeemed_p', 0),
+            'total_books': detail.get('books_total', detail.get('b_cnt', 0)),
             'level': detail.get('level', {}).get('name', ''),
             'badges_count': len(detail.get('badges', [])),
             'badges': [{'name': b['name'], 'desc': b['desc']} for b in detail.get('badges', [])]
@@ -52,8 +54,8 @@ def integration_add_points(request, member_id):
     amount = data.get('amount')
     description = data.get('description', 'Manual API Add')
     
-    if not amount or not isinstance(amount, (int, float)):
-        return JsonResponse({'success': False, 'error': 'Amount must be a number.'}, status=400)
+    if not isinstance(amount, (int, float)) or amount <= 0:
+        return JsonResponse({'success': False, 'error': 'Amount must be a positive number.'}, status=400)
         
     member = Member.objects.filter(member_id=member_id).first()
     if not member:
@@ -128,16 +130,28 @@ def integration_redeem(request):
     
     try:
         with transaction.atomic():
-            # Kurangi stok terlebih dahulu
-            reward.stock = models.F('stock') - 1
-            reward.save()
+            # Lock reward row to prevent stock race condition
+            locked_reward = Reward.objects.select_for_update().filter(id=reward_id, is_active=True).first()
+            if not locked_reward or locked_reward.stock <= 0:
+                return JsonResponse({'success': False, 'error': 'Reward is out of stock.'}, status=400)
+                
+            # Potong poin langsung secara atomik di PointTransaction
+            PointTransaction.objects.create(
+                cardnumber=member_id,
+                amount=-locked_reward.points_cost,
+                transaction_type='redeem',
+                description=f"[API {request.api_key.name}] Redeem Poin: {locked_reward.name}"
+            )
+
+            # Kurangi stok
+            locked_reward.stock = models.F('stock') - 1
+            locked_reward.save()
             
-            # Buat RedemptionClaim (Pending)
-            # Poin BELUM DIPOTONG PERMANEN (belum masuk PointTransaction)
+            # Buat RedemptionClaim
             RedemptionClaim.objects.create(
                 code=claim_code,
                 member=member,
-                reward=reward,
+                reward=locked_reward,
                 status='pending'
             )
             

@@ -18,7 +18,10 @@ def require_api_key(view_func):
         if not key:
             return JsonResponse({'success': False, 'error': 'API Key is missing.'}, status=401)
             
-        api_key_obj = APIKey.objects.filter(key=key, is_active=True).first()
+        import hashlib
+        from django.db.models import Q
+        key_hash = hashlib.sha256(key.encode()).hexdigest()
+        api_key_obj = APIKey.objects.filter(Q(key=key) | Q(key=key_hash), is_active=True).first()
         if not api_key_obj:
             return JsonResponse({'success': False, 'error': 'Invalid or inactive API Key.'}, status=403)
             

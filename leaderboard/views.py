@@ -5,7 +5,6 @@ from datetime import date, timedelta, datetime
 import json
 import hashlib
 from .models import Member, Reward, PointTransaction, RedemptionClaim, Seminar, SeminarRegistration, LeaderboardConfig, LevelTier
-from .demo_data import DEMO_DATA
 from .koha_utils import get_live_members, get_live_member_detail, get_live_faculties_stats, get_live_books_stats, get_live_daily_visits
 from .exports import export_excel_response, export_pdf_response
 from django.db import connections
@@ -29,13 +28,6 @@ def api_admin_badges(request):
         'pending_claims': RedemptionClaim.objects.filter(status='pending').count(),
         'pending_registrations': SeminarRegistration.objects.filter(status='registered').count()
     })
-
-def _use_demo():
-    try:
-        connections['koha'].ensure_connection()
-        return False
-    except Exception:
-        return True
 
 def cache_page_server_only(timeout):
     def decorator(view_func):
@@ -68,36 +60,6 @@ def index(request):
 
 @cache_page_server_only(60 * 10)
 def api_overview(request):
-    if _use_demo():
-        import copy
-        overview = copy.deepcopy(DEMO_DATA['overview'])
-        tiers = list(LevelTier.objects.all().order_by('min_xp'))
-        
-        # Add local transactions to demo leaderboard members
-        for m in overview['leaderboard']:
-            local_pt = PointTransaction.objects.filter(cardnumber=m['id']).aggregate(total=Sum('amount'))['total'] or 0
-            m['visits'] = m['visits'] + local_pt
-            m['total_p'] = m['visits']
-            
-            if 'level' in m and tiers:
-                m['level']['current_xp'] = m['visits']
-                for tier in tiers:
-                    if tier.max_xp is None or m['visits'] <= tier.max_xp:
-                        denom = max(1, (tier.max_xp - tier.min_xp) if tier.max_xp else 1)
-                        m['level']['name'] = tier.name
-                        m['level']['level_num'] = tier.level_num
-                        m['level']['color'] = tier.color
-                        m['level']['progress_perc'] = min(100, int(((m['visits'] - tier.min_xp) / denom) * 100))
-                        m['level']['max_xp'] = tier.max_xp if tier.max_xp else m['visits']
-                        break
-                    
-        overview['leaderboard'].sort(key=lambda x: x['visits'], reverse=True)
-        for i, m in enumerate(overview['leaderboard']):
-            m['rank'] = i + 1
-            
-        overview['daily_visits'] = [540, 610, 580, 590, 520, 240, 0]
-        return JsonResponse(overview)
-    
     date_from, date_to = get_date_range(request)
     q = request.GET.get('q', '').strip()
     
@@ -141,18 +103,6 @@ def api_overview(request):
 
 @cache_page_server_only(60 * 10)
 def api_role_leaderboard(request, role):
-    if _use_demo():
-        from django.db.models import Sum
-        import copy
-        role_data = copy.deepcopy(DEMO_DATA.get(f'role_{role}', {'leaderboard': []}))
-        for m in role_data['leaderboard']:
-            local_pt = PointTransaction.objects.filter(cardnumber=m['id']).aggregate(total=Sum('amount'))['total'] or 0
-            m['visits'] = m['visits'] + local_pt
-            m['total_p'] = m['visits']
-        role_data['leaderboard'].sort(key=lambda x: x['visits'], reverse=True)
-        for i, m in enumerate(role_data['leaderboard']):
-            m['rank'] = i + 1
-        return JsonResponse(role_data)
     date_from, date_to = get_date_range(request)
     q = request.GET.get('q', '').strip()
     
@@ -166,7 +116,6 @@ def api_role_leaderboard(request, role):
 
 @cache_page_server_only(60 * 10)
 def api_books(request):
-    if _use_demo(): return JsonResponse(DEMO_DATA['books'])
     date_from, date_to = get_date_range(request)
 
     # Kedua fungsi ini share cache key yang sama — get_live_members tidak query ulang
@@ -182,7 +131,6 @@ def api_books(request):
 
 @cache_page_server_only(60 * 10)
 def api_faculties(request):
-    if _use_demo(): return JsonResponse(DEMO_DATA['faculties'])
     date_from, date_to = get_date_range(request)
 
     faculties = get_live_faculties_stats(date_from, date_to)
@@ -218,26 +166,6 @@ def api_member_detail(request, member_id):
             'image_url': img_url
         })
 
-    if _use_demo(): 
-        all_p = (DEMO_DATA['overview']['leaderboard'] + DEMO_DATA.get('role_student', {}).get('leaderboard', []))
-        p = next((x for x in all_p if x['id'] == member_id), None)
-        if not p: return JsonResponse({'error': 'Not found'}, status=404)
-        demo_badges = [
-            {'name': 'Library Legend', 'desc': 'Top 10 Klasemen!', 'image_url': '/static/img/badges/top 10 leaderboard.png', 'color': '#f1c40f'},
-            {'name': 'Weekly Warrior', 'desc': 'Rajin datang ke perpus.', 'image_url': '/static/img/badges/weekly warior.png', 'color': '#4DA6FF'},
-            {'name': 'Book Worm', 'desc': 'Sering pinjam buku.', 'image_url': '/static/img/badges/bookworm.png', 'color': '#1CBDB3'}
-        ]
-        return JsonResponse({
-            **p, 
-            'visits_range': p['visits'], 
-            'visits_total': p['visits'], 
-            'books_range': p['books'], 
-            'books_total': p['books'], 
-            'badges': demo_badges, 
-            'recent_borrows': [],
-            'rewards': rewards_list
-        })
-        
     date_from, date_to = get_date_range(request)
     detail = get_live_member_detail(member_id, date_from, date_to)
     if not detail:
@@ -247,32 +175,6 @@ def api_member_detail(request, member_id):
 
 @cache_page_server_only(60 * 10)
 def api_pemustaka_teraktif(request):
-    if _use_demo():
-        from .demo_data import _STUDENTS, _LECTURERS, _STAFF, _ALL
-        role_param = request.GET.get('role', 'all').lower()
-        role_map = {
-            # bahasa Indonesia
-            'mahasiswa': 'student', 'dosen': 'lecturer', 'tendik': 'staff',
-            # bahasa Inggris (dipakai JS frontend)
-            'student': 'student', 'lecturer': 'lecturer', 'staff': 'staff',
-        }
-        role = role_map.get(role_param, 'all')
-        if role == 'student': pool = _STUDENTS
-        elif role == 'lecturer': pool = _LECTURERS
-        elif role == 'staff': pool = _STAFF
-        else: pool = _ALL
-        top_xp_k        = sorted(pool, key=lambda x: x['visits'], reverse=True)[:10]
-        top_pengunjung_k = sorted(pool, key=lambda x: x['visits'], reverse=True)[:10]
-        top_peminjam_k  = sorted(pool, key=lambda x: x['books'],  reverse=True)[:10]
-        # Seminar: ambil 6 teratas (sisanya 0 seminar)
-        top_seminar_k   = sorted(pool[:6], key=lambda x: x['visits'], reverse=True)[:10]
-        return JsonResponse({
-            'top_xp':        [dict(p, rank=i+1, total_p=p['visits']) for i, p in enumerate(top_xp_k)],
-            'top_pengunjung': [dict(p, rank=i+1) for i, p in enumerate(top_pengunjung_k)],
-            'top_peminjam':  [dict(p, rank=i+1) for i, p in enumerate(top_peminjam_k)],
-            'top_seminar':   [dict(p, rank=i+1, visits=0) for i, p in enumerate(top_seminar_k)],
-        })
-        
     date_from, date_to = get_date_range(request)
     if 'year' in request.GET:
         try:
@@ -328,12 +230,10 @@ def api_pemustaka_teraktif(request):
 
 def export_excel(request):
     date_from, date_to = get_date_range(request)
-    if _use_demo(): return JsonResponse({'error': 'Export not supported in demo mode'})
     return export_excel_response(date_from, date_to)
 
 def export_pdf(request):
     date_from, date_to = get_date_range(request)
-    if _use_demo(): return JsonResponse({'error': 'Export not supported in demo mode'})
     return export_pdf_response(date_from, date_to)
 
 
@@ -346,28 +246,55 @@ import random
 from django.db import models
 
 def get_member_total_points(cardnumber):
+    """Mengembalikan saldo poin yang siap ditukarkan (Available XP / Net Poin)."""
     today = date.today()
     first = LeaderboardConfig.get_active_reset_date()
     
-    if _use_demo():
-        from .demo_data import _ALL
-        p = next((x for x in _ALL if x['id'] == cardnumber), None)
-        if p:
-            from django.db.models import Sum
-            from .models import PointTransaction, RedemptionClaim
-            local_pt = PointTransaction.objects.filter(cardnumber=cardnumber).aggregate(total=Sum('amount'))['total'] or 0
-            pending_pt = RedemptionClaim.objects.filter(member__member_id=cardnumber, status='pending').aggregate(total=Sum('reward__points_cost'))['total'] or 0
-            return p['visits'] + local_pt - pending_pt
-        return 0
-        
     from .koha_utils import get_live_members
     members = get_live_members(first, today, search_q=cardnumber)
     if members:
+        card_clean = str(cardnumber).strip().upper()
         for m in members:
-            if m['id'] == cardnumber:
-                return m['total_p']
+            if m['id'].strip().upper() == card_clean:
+                return m.get('available_p', m['total_p'])
     return 0
 
+def get_member_gross_points(cardnumber):
+    """Mengembalikan total akumulasi poin semester ini (Gross XP untuk Klasemen)."""
+    today = date.today()
+    first = LeaderboardConfig.get_active_reset_date()
+    
+    from .koha_utils import get_live_members
+    members = get_live_members(first, today, search_q=cardnumber)
+    if members:
+        card_clean = str(cardnumber).strip().upper()
+        for m in members:
+            if m['id'].strip().upper() == card_clean:
+                return m.get('total_p', 0)
+    return 0
+
+
+def _sync_single_member_from_koha(member_id):
+    try:
+        from .models import Faculty
+        from .koha_utils import _get_role_from_category
+        with connections['koha'].cursor() as cursor:
+            cursor.execute("SELECT cardnumber, surname, firstname, categorycode, branchcode, email FROM borrowers WHERE cardnumber = %s OR borrowernumber = %s LIMIT 1", [member_id, member_id])
+            row = cursor.fetchone()
+            if row:
+                cnum, sur, first, cat, branch, mail = row
+                name = f"{(first or '').strip()} {(sur or '').strip()}".strip() or str(cnum or member_id)
+                return Member.objects.create(
+                    member_id=str(cnum or member_id)[:20],
+                    name=name[:150],
+                    role=_get_role_from_category(cat) if _get_role_from_category(cat) != 'unknown' else 'student',
+                    faculty=Faculty.objects.filter(code=branch).first(),
+                    email=mail.strip() if mail and mail.strip() else f"{member_id.lower()}@student.ums.ac.id",
+                    is_active=True
+                )
+    except Exception:
+        pass
+    return None
 
 @csrf_exempt
 def api_request_otp(request):
@@ -384,8 +311,14 @@ def api_request_otp(request):
     
     if not member_id or not reward_id:
         return JsonResponse({'success': False, 'error': 'NIM dan ID Hadiah harus diisi.'}, status=400)
+
+    if cache.get(f"otp_locked_{member_id}"):
+        return JsonResponse({'success': False, 'error': 'Terlalu banyak percobaan OTP gagal. Akun dibatasi sementara selama 10 menit demi keamanan.'}, status=429)
+
+    if cache.get(f"otp_cooldown_{member_id}"):
+        return JsonResponse({'success': False, 'error': 'Silakan tunggu 60 detik sebelum meminta kode OTP kembali.'}, status=429)
         
-    member = Member.objects.filter(member_id=member_id).first()
+    member = Member.objects.filter(member_id=member_id).first() or _sync_single_member_from_koha(member_id)
     if not member:
         return JsonResponse({'success': False, 'error': 'NIM/ID Anggota tidak terdaftar.'}, status=404)
         
@@ -405,6 +338,7 @@ def api_request_otp(request):
         
     otp = str(random.randint(100000, 999999))
     cache.set(f"otp_{member_id}", {'otp': otp, 'reward_id': reward_id}, 180)
+    cache.set(f"otp_cooldown_{member_id}", True, 60)
     
     email = member.email
     if not email:
@@ -445,10 +379,8 @@ Team UMSLibrary
         )
         email_sent = True
     except Exception as e:
-        print(f"=== EMAIL OTP SENT TO {email} (SMTP error fallback) ===")
-        print(f"SMTP Error Details: {e}")
-        print(message)
-        print("=========================================================")
+        import logging
+        logging.getLogger(__name__).warning("SMTP error delivering OTP to %s: %s", email, e)
         
     return JsonResponse({
         'success': True,
@@ -473,13 +405,25 @@ def api_verify_otp_and_redeem(request):
     
     if not member_id or not otp_input:
         return JsonResponse({'success': False, 'error': 'NIM dan OTP harus diisi.'}, status=400)
+
+    if cache.get(f"otp_locked_{member_id}"):
+        return JsonResponse({'success': False, 'error': 'Terlalu banyak percobaan OTP salah. Akun dibatasi sementara selama 10 menit demi keamanan.'}, status=429)
         
     cached_data = cache.get(f"otp_{member_id}")
     if not cached_data:
         return JsonResponse({'success': False, 'error': 'Kode OTP sudah kadaluarsa atau belum diajukan.'}, status=400)
         
     if cached_data['otp'] != otp_input:
-        return JsonResponse({'success': False, 'error': 'Kode OTP salah.'}, status=400)
+        attempts_key = f"otp_attempts_{member_id}"
+        attempts = cache.get(attempts_key, 0) + 1
+        if attempts >= 3:
+            cache.delete(f"otp_{member_id}")
+            cache.delete(attempts_key)
+            cache.set(f"otp_locked_{member_id}", True, 600)
+            return JsonResponse({'success': False, 'error': 'Kode OTP salah 3 kali. Kode dibatalkan dan permintaan dibatasi 10 menit demi keamanan.'}, status=429)
+        else:
+            cache.set(attempts_key, attempts, 180)
+            return JsonResponse({'success': False, 'error': f'Kode OTP salah. Sisa percobaan: {3 - attempts}.'}, status=400)
         
     reward_id = cached_data['reward_id']
     member = Member.objects.filter(member_id=member_id).first()
@@ -496,6 +440,7 @@ def api_verify_otp_and_redeem(request):
         return JsonResponse({'success': False, 'error': 'Poin Anda tidak cukup.'}, status=400)
         
     cache.delete(f"otp_{member_id}")
+    cache.delete(f"otp_attempts_{member_id}")
     
     from django.db import transaction
     import uuid

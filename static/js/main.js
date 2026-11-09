@@ -110,13 +110,13 @@ function bindControls() {
     }, 350);
   });
 
-  // Date filters
+  // Date filters (Custom Apply)
   const applyDateFilter = () => {
     currentDateFrom = document.getElementById('dateFrom')?.value || '';
     currentDateTo = document.getElementById('dateTo')?.value || '';
     loadTab(currentTab);
     if (typeof showToast === 'function') {
-      showToast(ICONS.chart(18, 'var(--primary)'), `Filter diterapkan: ${currentDateFrom} s/d ${currentDateTo}`);
+      showToast(ICONS.chart(18, 'var(--primary)'), `Filter kustom: ${currentDateFrom} s/d ${currentDateTo}`);
     }
   };
 
@@ -124,23 +124,65 @@ function bindControls() {
   document.getElementById('dateFrom')?.addEventListener('change', applyDateFilter);
   document.getElementById('dateTo')?.addEventListener('change', applyDateFilter);
 
-  // Quick Preset Buttons
-  document.querySelectorAll('.preset-btn').forEach(btn => {
+  // Period Preset Pills (Semester Ini, Bulan Ini, Sepanjang Masa)
+  document.querySelectorAll('.preset-pill[data-preset]').forEach(btn => {
     btn.addEventListener('click', () => {
-      const days = parseInt(btn.dataset.days);
-      const to = new Date();
-      const from = new Date();
-      from.setDate(to.getDate() - days);
+      const preset = btn.dataset.preset;
+      const today = new Date();
+      const todayIso = today.toISOString().split('T')[0];
 
-      document.getElementById('dateFrom').value = from.toISOString().split('T')[0];
-      document.getElementById('dateTo').value = to.toISOString().split('T')[0];
-      currentDateFrom = document.getElementById('dateFrom').value;
-      currentDateTo = document.getElementById('dateTo').value;
+      let fromIso = '';
+      let toIso = todayIso;
+      let label = '';
 
-      document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+      if (preset === 'semester') {
+        fromIso = btn.dataset.from || '';
+        toIso = btn.dataset.to || todayIso;
+        label = 'Semester Ini';
+      } else if (preset === 'month') {
+        const y = today.getFullYear();
+        const m = String(today.getMonth() + 1).padStart(2, '0');
+        fromIso = `${y}-${m}-01`;
+        toIso = todayIso;
+        label = 'Bulan Ini';
+      } else if (preset === 'alltime') {
+        fromIso = '2020-01-01';
+        toIso = todayIso;
+        label = 'Sepanjang Masa (All-Time)';
+      }
+
+      currentDateFrom = fromIso;
+      currentDateTo = toIso;
+
+      const dFromInput = document.getElementById('dateFrom');
+      const dToInput = document.getElementById('dateTo');
+      if (dFromInput && fromIso) dFromInput.value = fromIso;
+      if (dToInput && toIso) dToInput.value = toIso;
+
+      document.querySelectorAll('.preset-pill').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
+
+      // Hide custom drawer if open
+      const drawer = document.getElementById('customDateDrawer');
+      if (drawer) drawer.style.display = 'none';
+
       loadTab(currentTab);
+      if (typeof showToast === 'function') {
+        showToast(ICONS.chart(18, 'var(--primary)'), `Periode: ${label}`);
+      }
     });
+  });
+
+  // Toggle Custom Date Drawer
+  document.getElementById('btnToggleCustomDate')?.addEventListener('click', (e) => {
+    const drawer = document.getElementById('customDateDrawer');
+    if (!drawer) return;
+    const isHidden = drawer.style.display === 'none' || !drawer.style.display;
+    drawer.style.display = isHidden ? 'inline-flex' : 'none';
+    if (isHidden) {
+      document.querySelectorAll('.preset-pill').forEach(b => b.classList.remove('active'));
+      e.currentTarget.classList.add('active');
+    }
   });
 
   // Exports
@@ -647,9 +689,10 @@ function renderModal(data, role) {
   const borrows = data.recent_borrows || [];
   const badges = data.badges || [];
   const rewards = data.rewards || [];
-  const userXP = data.visits_total || 0;
+  const userXP = data.available_p !== undefined ? data.available_p : (data.total_p || 0);
+  const totalXP = data.total_p !== undefined ? data.total_p : (data.visits_total || 0);
 
-  const shareText = encodeURIComponent(`Saya baru saja meraih prestasi di LibraryRank Universitas! Cek profil ${data.name} dengan total XP ${data.visits_total}.`);
+  const shareText = encodeURIComponent(`Saya baru saja meraih prestasi di LibraryRank Universitas! Cek profil ${data.name} dengan skor klasemen ${totalXP.toLocaleString()} XP.`);
   const shareUrl = encodeURIComponent(window.location.origin);
   const lvl = data.level || { name: 'Visitor', progress_perc: 0, current_xp: 0, max_xp: 100, color: '#95a5a6' };
 
@@ -723,10 +766,23 @@ function renderModal(data, role) {
         </div>
       </div>
       
-      <div class="modal-stats" style="margin-top:24px; display:flex; justify-content:center; gap:20px;">
-        <div class="modal-stat"><strong style="color:${text}">${data.visits_total}</strong><span>Total Visits</span></div>
-        <div class="modal-stat"><strong style="color:var(--purple)">${data.books_total}</strong><span>Total Books</span></div>
-        <div class="modal-stat"><strong style="color:var(--orange)">${data.streak}</strong><span>Day Streak <span style="vertical-align:middle; display:inline-flex; align-items:center; color:var(--orange);">${ICONS.fire(18, 'var(--orange)')}</span></span></div>
+      <div class="modal-stats" style="margin-top:20px; display:flex; justify-content:center; gap:12px; flex-wrap:wrap;">
+        <div class="modal-stat" style="min-width:105px; padding:8px 12px; background:var(--surface2); border:1px solid var(--border); border-radius:8px;">
+          <strong style="color:var(--primary); font-size:1.15rem; display:block;">${totalXP.toLocaleString()} XP</strong>
+          <span style="font-size:0.75rem; color:var(--muted); font-weight:600;">Skor Klasemen</span>
+        </div>
+        <div class="modal-stat" style="min-width:105px; padding:8px 12px; background:var(--surface2); border:1px solid rgba(245,158,11,0.3); border-radius:8px;">
+          <strong style="color:var(--gold); font-size:1.15rem; display:block;">${userXP.toLocaleString()} XP</strong>
+          <span style="font-size:0.75rem; color:var(--muted); font-weight:600;">Saldo Belanja</span>
+        </div>
+        <div class="modal-stat" style="min-width:85px; padding:8px 12px; background:var(--surface2); border:1px solid var(--border); border-radius:8px;">
+          <strong style="color:${text}; font-size:1.15rem; display:block;">${data.visits_total}</strong>
+          <span style="font-size:0.75rem; color:var(--muted); font-weight:600;">Kunjungan</span>
+        </div>
+        <div class="modal-stat" style="min-width:85px; padding:8px 12px; background:var(--surface2); border:1px solid var(--border); border-radius:8px;">
+          <strong style="color:var(--purple); font-size:1.15rem; display:block;">${data.books_total}</strong>
+          <span style="font-size:0.75rem; color:var(--muted); font-weight:600;">Buku Dipinjam</span>
+        </div>
       </div>
 
       ${badges.length ? `
@@ -1148,7 +1204,9 @@ function openRedeemModal(rewardId, rewardName, rewardCost, rewardStock, prefille
         <div style="font-size:3rem; color:var(--green); margin-bottom:14px; display:flex; justify-content:center;">${ICONS.celebration(48, 'var(--green)')}</div>
         <h3 style="font-size:1.25rem; font-weight:800; color:var(--text); margin-bottom:8px;">Penukaran Berhasil!</h3>
         <p style="font-size:0.88rem; color:var(--muted); margin-bottom:22px; line-height:1.5;">
-          Poin Anda telah berhasil dipotong sebanyak <strong style="color:var(--gold);">${cost} XP</strong>.<br>Sisa poin Anda sekarang: <strong>${remainingPoints} XP</strong>.
+          Saldo belanja poin Anda berhasil dipotong <strong style="color:var(--gold);">${cost} XP</strong>.<br>
+          Sisa saldo belanja Anda: <strong>${remainingPoints} XP</strong>.<br>
+          <span style="display:inline-block; margin-top:6px; font-size:0.8rem; color:var(--green); font-weight:700;">★ Peringkat &amp; Skor Klasemen Anda tetap aman &amp; tidak berkurang!</span>
         </p>
 
         <!-- QR Code -->

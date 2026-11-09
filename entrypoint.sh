@@ -7,6 +7,9 @@ if [ ! -f /app/cert.pem ] || [ ! -f /app/key.pem ]; then
     openssl req -x509 -newkey rsa:2048 -keyout /app/key.pem -out /app/cert.pem -days 365 -nodes -subj "/CN=libraryrank.ums.ac.id"
 fi
 
+echo "[Entrypoint] Running database migrations..."
+python manage.py migrate --noinput
+
 # Execute CMD passed to container or default gunicorn
 if [ $# -gt 0 ]; then
     exec "$@"

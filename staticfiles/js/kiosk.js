@@ -198,9 +198,16 @@ function initThemeToggle() {
    ------------------------------------------------------------- */
 async function fetchKioskData() {
   try {
+    const dFrom = document.body.dataset.dateFrom || '';
+    const dTo = document.body.dataset.dateTo || '';
+    const params = new URLSearchParams();
+    if (dFrom) params.append('date_from', dFrom);
+    if (dTo) params.append('date_to', dTo);
+    const qs = params.toString() ? `?${params.toString()}` : '';
+
     const [overviewRes, facultiesRes] = await Promise.all([
-      fetch('/api/overview/'),
-      fetch('/api/faculties/')
+      fetch(`/api/overview/${qs}`),
+      fetch(`/api/faculties/${qs}`)
     ]);
     
     if (!overviewRes.ok) throw new Error('Failed to fetch overview');

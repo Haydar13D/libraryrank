@@ -2,6 +2,12 @@
 
 {% load i18n static unfold %}
 
+{% block extrahead %}
+    {{ block.super }}
+    <link rel="icon" type="image/png" href="{% static 'img/logo4.png' %}">
+    <link rel="apple-touch-icon" href="{% static 'img/logo4.png' %}">
+{% endblock %}
+
 {% block extrastyle %}
     {{ block.super }}
     {{ form.media }}

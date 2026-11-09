@@ -143,8 +143,15 @@ class Command(BaseCommand):
         lecturer_cats = [c.upper() for c in settings.KOHA_LECTURER_CATEGORIES]
         staff_cats    = [c.upper() for c in settings.KOHA_STAFF_CATEGORIES]
 
+        # Incremental filter: when not full sync, only check patrons updated or enrolled since self.since
+        where_sql = "WHERE (b.lost = 0 OR b.lost IS NULL)"
+        params = []
+        if not self.full:
+            where_sql += " AND (b.updated_on >= %s OR b.dateenrolled >= %s)"
+            params = [self.since, self.since]
+
         with self.koha.cursor() as cursor:
-            cursor.execute("""
+            cursor.execute(f"""
                 SELECT
                     b.borrowernumber,
                     b.cardnumber,
@@ -157,66 +164,86 @@ class Command(BaseCommand):
                     c.description AS category_description
                 FROM borrowers b
                 LEFT JOIN categories c ON b.categorycode = c.categorycode
-                WHERE b.lost = 0 OR b.lost IS NULL
+                {where_sql}
                 ORDER BY b.borrowernumber
-            """)
+            """, params)
             rows = cursor.fetchall()
 
+        existing_members = {m.member_id: m for m in Member.objects.all()}
         member_map = {}  # borrowernumber → Member instance
-        created_count = updated_count = skipped_count = 0
+        to_create = []
+        to_update_dict = {}  # pk → Member instance
+        skipped_count = 0
 
-        with transaction.atomic():
-            for row in rows:
-                (borrowernumber, cardnumber, surname, firstname,
-                 categorycode, branchcode, dateenrolled, email,
-                 category_desc) = row
+        for row in rows:
+            (borrowernumber, cardnumber, surname, firstname,
+             categorycode, branchcode, dateenrolled, email,
+             category_desc) = row
 
-                cat_upper = (categorycode or '').upper()
-                if cat_upper in student_cats:
-                    role = 'student'
-                elif cat_upper in lecturer_cats:
-                    role = 'lecturer'
-                elif cat_upper in staff_cats:
-                    role = 'staff'
-                else:
-                    skipped_count += 1
-                    continue  # skip unknown categories
+            cat_upper = (categorycode or '').upper()
+            if cat_upper in student_cats:
+                role = 'student'
+            elif cat_upper in lecturer_cats:
+                role = 'lecturer'
+            elif cat_upper in staff_cats:
+                role = 'staff'
+            else:
+                skipped_count += 1
+                continue
 
-                full_name = f"{(firstname or '').strip()} {(surname or '').strip()}".strip()
-                if not full_name:
-                    full_name = cardnumber or f'Patron-{borrowernumber}'
-                full_name = full_name[:150]
+            full_name = f"{(firstname or '').strip()} {(surname or '').strip()}".strip()
+            if not full_name:
+                full_name = cardnumber or f'Patron-{borrowernumber}'
+            full_name = full_name[:150]
 
-                faculty = faculty_map.get(branchcode)
-                year_enrolled = None
-                if dateenrolled and role == 'student':
-                    year_enrolled = dateenrolled.year if hasattr(dateenrolled, 'year') else None
+            faculty = faculty_map.get(branchcode)
+            year_enrolled = None
+            if dateenrolled and role == 'student':
+                year_enrolled = dateenrolled.year if hasattr(dateenrolled, 'year') else None
 
-                member_id = str(cardnumber or f'KOHA-{borrowernumber}')[:20]
+            member_id = str(cardnumber or f'KOHA-{borrowernumber}')[:20]
+            member_email = email.strip() if email and email.strip() else f"{member_id.lower()}@student.ums.ac.id"
+            title_val = (category_desc or '')[:100]
 
-                if not self.dry_run:
-                    member, created = Member.objects.update_or_create(
-                        member_id=member_id,
-                        defaults={
-                            'name': full_name,
-                            'role': role,
-                            'faculty': faculty,
-                            'year_enrolled': year_enrolled,
-                            'title': (category_desc or '')[:100],
-                            'email': email.strip() if email and email.strip() else f"{member_id.lower()}@student.ums.ac.id",
-                            'is_active': True,
-                        }
-                    )
-                    member_map[borrowernumber] = member
-                    if created:
-                        created_count += 1
-                    else:
-                        updated_count += 1
-                else:
-                    self.stdout.write(f'   [dry] {role}: {full_name} ({member_id})')
+            if member_id in existing_members:
+                m = existing_members[member_id]
+                changed = False
+                if m.name != full_name: m.name = full_name; changed = True
+                if m.role != role: m.role = role; changed = True
+                if m.faculty_id != (faculty.id if faculty else None): m.faculty = faculty; changed = True
+                if m.year_enrolled != year_enrolled: m.year_enrolled = year_enrolled; changed = True
+                if m.title != title_val: m.title = title_val; changed = True
+                if m.email != member_email and (email and email.strip()): m.email = member_email; changed = True
+                if changed and m.pk is not None:
+                    to_update_dict[m.pk] = m
+                member_map[borrowernumber] = m
+            else:
+                new_m = Member(
+                    member_id=member_id,
+                    name=full_name,
+                    role=role,
+                    faculty=faculty,
+                    year_enrolled=year_enrolled,
+                    title=title_val,
+                    email=member_email,
+                    is_active=True,
+                )
+                to_create.append(new_m)
+                existing_members[member_id] = new_m
+                member_map[borrowernumber] = new_m
+
+        if not self.dry_run:
+            if to_create:
+                Member.objects.bulk_create(to_create, batch_size=1000)
+            if to_update_dict:
+                Member.objects.bulk_update(
+                    list(to_update_dict.values()),
+                    ['name', 'role', 'faculty', 'year_enrolled', 'title', 'email'],
+                    batch_size=1000
+                )
 
         self.stdout.write(
-            f'   Members: {created_count} created, {updated_count} updated, {skipped_count} skipped (unknown category)'
+            f'   Members: {len(to_create)} created, {len(to_update_dict)} updated, {skipped_count} skipped'
         )
         return member_map
 
@@ -245,47 +272,64 @@ class Command(BaseCommand):
             rows = cursor.fetchall()
 
         book_map = {}  # biblionumber → Book instance
-        created_count = updated_count = 0
+        existing_books = {b.isbn: b for b in Book.objects.all()}
+        to_create = []
+        to_update_dict = {}  # pk → Book instance
 
-        with transaction.atomic():
-            for row in rows:
-                biblionumber, title, author, isbn, itemtype, homebranch = row
-                if not title:
-                    continue
+        for row in rows:
+            biblionumber, title, author, isbn, itemtype, homebranch = row
+            if not title:
+                continue
 
-                isbn_clean = (isbn or '').strip()[:20] or f'KOHA-BIB-{biblionumber}'
-                faculty = faculty_map.get(homebranch)
+            isbn_clean = (isbn or '').strip()[:20] or f'KOHA-BIB-{biblionumber}'
+            faculty = faculty_map.get(homebranch)
+            title_val = (title or '')[:300]
+            author_val = (author or 'Unknown')[:200]
+            category_val = (itemtype or 'General')[:100]
 
-                if not self.dry_run:
-                    book, created = Book.objects.update_or_create(
-                        isbn=isbn_clean,
-                        defaults={
-                            'title': (title or '')[:300],
-                            'author': (author or 'Unknown')[:200],
-                            'category': (itemtype or 'General')[:100],
-                            'faculty': faculty,
-                        }
-                    )
-                    book_map[biblionumber] = book
-                    if created:
-                        created_count += 1
-                    else:
-                        updated_count += 1
+            if isbn_clean in existing_books:
+                b_obj = existing_books[isbn_clean]
+                changed = False
+                if b_obj.title != title_val: b_obj.title = title_val; changed = True
+                if b_obj.author != author_val: b_obj.author = author_val; changed = True
+                if b_obj.category != category_val: b_obj.category = category_val; changed = True
+                if b_obj.faculty_id != (faculty.id if faculty else None): b_obj.faculty = faculty; changed = True
+                if changed and b_obj.pk is not None:
+                    to_update_dict[b_obj.pk] = b_obj
+                book_map[biblionumber] = b_obj
+            else:
+                new_b = Book(
+                    isbn=isbn_clean,
+                    title=title_val,
+                    author=author_val,
+                    category=category_val,
+                    faculty=faculty,
+                )
+                to_create.append(new_b)
+                existing_books[isbn_clean] = new_b
+                book_map[biblionumber] = new_b
 
-        self.stdout.write(f'   Books: {created_count} created, {updated_count} updated')
+        if not self.dry_run:
+            if to_create:
+                Book.objects.bulk_create(to_create, batch_size=1000)
+            if to_update_dict:
+                Book.objects.bulk_update(list(to_update_dict.values()), ['title', 'author', 'category', 'faculty'], batch_size=1000)
+
+        self.stdout.write(f'   Books: {len(to_create)} created, {len(to_update_dict)} updated')
         return book_map
 
     # ─────────────────────────────────────────────────────
-    # STEP 4a: Visits from Koha Satellite — visitorhistory (gate scanner)
-    # This is the PRIMARY source of visits: data dari mesin scan
-    # pintu masuk perpustakaan (cardnumber di-scan = 1 kunjungan).
+    # STEP 4: Visits from Koha Satellite & Koha Statistics
     # ─────────────────────────────────────────────────────
     def _sync_visits(self, member_map):
-        # Build a reverse lookup: cardnumber → Member (normalized uppercase)
-        card_to_member = {str(m.member_id).strip().upper(): m for m in member_map.values() if m.member_id}
+        card_to_member = {str(m.member_id).strip().upper(): m for m in Member.objects.all()}
+        existing_visits = set(Visit.objects.filter(visited_at__gte=self.since).values_list('member_id', 'visited_at__date'))
+        from datetime import time as time_cls
 
         # ── PRIMARY: Satellite visitorhistory ──────────────────────────────
         sat_created = sat_skipped = 0
+        to_create_sat = []
+
         if self.satellite_conn:
             self.stdout.write(f'Syncing visits from Satellite visitorhistory (since {self.since})...')
             with self.satellite_conn.cursor() as cursor:
@@ -299,31 +343,28 @@ class Command(BaseCommand):
                 """, [self.since])
                 sat_rows = cursor.fetchall()
 
-            from datetime import time as time_cls
-            with transaction.atomic():
-                for cardnumber, visittime, location in sat_rows:
-                    card_clean = str(cardnumber).strip().upper()
-                    member = card_to_member.get(card_clean)
-                    if not member:
-                        sat_skipped += 1
-                        continue
+            for cardnumber, visittime, location in sat_rows:
+                card_clean = str(cardnumber).strip().upper()
+                member = card_to_member.get(card_clean)
+                if not member:
+                    sat_skipped += 1
+                    continue
 
-                    if not self.dry_run:
-                        visit_dt = visittime if timezone.is_aware(visittime) else timezone.make_aware(visittime)
-                        # Early Bird bonus: +3 jika datang sebelum 09:00
-                        visit_points = 5 if visit_dt.time() < time_cls(9, 0) else 2
+                visit_dt = visittime if timezone.is_aware(visittime) else timezone.make_aware(visittime)
+                v_date = visit_dt.date()
+                if (member.id, v_date) not in existing_visits:
+                    visit_points = 5 if visit_dt.time() < time_cls(9, 0) else 2
+                    to_create_sat.append(Visit(
+                        member=member,
+                        visited_at=visit_dt,
+                        purpose=f'Gate scan: {location or "perpus"}',
+                        earned_points=visit_points
+                    ))
+                    existing_visits.add((member.id, v_date))
+                    sat_created += 1
 
-                        _, created_flag = Visit.objects.get_or_create(
-                            member=member,
-                            visited_at__date=visit_dt.date(),
-                            defaults={
-                                'visited_at': visit_dt,
-                                'purpose': f'Gate scan: {location or "perpus"}',
-                                'earned_points': visit_points
-                            }
-                        )
-                        if created_flag:
-                            sat_created += 1
+            if not self.dry_run and to_create_sat:
+                Visit.objects.bulk_create(to_create_sat, batch_size=1000)
 
             self.stdout.write(f'   Visits (gate scan): {sat_created} created, {sat_skipped} skipped (patron not in system)')
         else:
@@ -333,41 +374,41 @@ class Command(BaseCommand):
         self.stdout.write(f'Syncing visits from Koha statistics (since {self.since})...')
         with self.koha.cursor() as cursor:
             cursor.execute("""
-                SELECT borrowernumber, datetime, branch, type
-                FROM statistics
-                WHERE borrowernumber IS NOT NULL
-                  AND datetime >= %s
-                  AND type IN ('issue', 'localuse', 'return')
-                ORDER BY datetime
+                SELECT s.borrowernumber, b.cardnumber, s.datetime, s.branch, s.type
+                FROM statistics s
+                LEFT JOIN borrowers b ON s.borrowernumber = b.borrowernumber
+                WHERE s.borrowernumber IS NOT NULL
+                  AND s.datetime >= %s
+                  AND s.type IN ('issue', 'localuse', 'return')
+                ORDER BY s.datetime
             """, [self.since])
             rows = cursor.fetchall()
 
         koha_created = koha_skipped = 0
-        from datetime import time as time_cls
-        with transaction.atomic():
-            for borrowernumber, dt, branch, stat_type in rows:
-                member = member_map.get(borrowernumber)
-                if not member:
-                    koha_skipped += 1
-                    continue
+        to_create_koha = []
 
-                if not self.dry_run:
-                    visit_dt = dt if timezone.is_aware(dt) else timezone.make_aware(dt)
-                    visit_points = 5 if visit_dt.time() < time_cls(9, 0) else 2
+        for borrowernumber, cardnumber, dt, branch, stat_type in rows:
+            card_clean = str(cardnumber or '').strip().upper()
+            member = card_to_member.get(card_clean) or member_map.get(borrowernumber)
+            if not member:
+                koha_skipped += 1
+                continue
 
-                    # get_or_create: jika hari itu sudah ada entri kunjungan (dari gate scan),
-                    # tidak akan dibuat duplikat
-                    _, created_flag = Visit.objects.get_or_create(
-                        member=member,
-                        visited_at__date=visit_dt.date(),
-                        defaults={
-                            'visited_at': visit_dt,
-                            'purpose': f'Koha: {stat_type}',
-                            'earned_points': visit_points
-                        }
-                    )
-                    if created_flag:
-                        koha_created += 1
+            visit_dt = dt if timezone.is_aware(dt) else timezone.make_aware(dt)
+            v_date = visit_dt.date()
+            if (member.id, v_date) not in existing_visits:
+                visit_points = 5 if visit_dt.time() < time_cls(9, 0) else 2
+                to_create_koha.append(Visit(
+                    member=member,
+                    visited_at=visit_dt,
+                    purpose=f'Koha: {stat_type}',
+                    earned_points=visit_points
+                ))
+                existing_visits.add((member.id, v_date))
+                koha_created += 1
+
+        if not self.dry_run and to_create_koha:
+            Visit.objects.bulk_create(to_create_koha, batch_size=1000)
 
         self.stdout.write(f'   Visits (Koha stats): {koha_created} created, {koha_skipped} skipped (patron not in system)')
 
@@ -377,11 +418,11 @@ class Command(BaseCommand):
     def _sync_borrows(self, member_map, book_map):
         self.stdout.write(f'Syncing borrow records from Koha issues (since {self.since})...')
 
-        # Active checkouts
         with self.koha.cursor() as cursor:
             cursor.execute("""
                 SELECT
                     i.borrowernumber,
+                    b.cardnumber,
                     i.itemnumber,
                     it.biblionumber,
                     i.issuedate,
@@ -390,12 +431,14 @@ class Command(BaseCommand):
                     'borrowed' AS status
                 FROM issues i
                 JOIN items it ON i.itemnumber = it.itemnumber
+                LEFT JOIN borrowers b ON i.borrowernumber = b.borrowernumber
                 WHERE i.issuedate >= %s
 
                 UNION ALL
 
                 SELECT
                     oi.borrowernumber,
+                    b.cardnumber,
                     oi.itemnumber,
                     it.biblionumber,
                     oi.issuedate,
@@ -404,64 +447,83 @@ class Command(BaseCommand):
                     'returned' AS status
                 FROM old_issues oi
                 JOIN items it ON oi.itemnumber = it.itemnumber
+                LEFT JOIN borrowers b ON oi.borrowernumber = b.borrowernumber
                 WHERE oi.issuedate >= %s
 
                 ORDER BY issuedate
             """, [self.since, self.since])
             rows = cursor.fetchall()
 
-        created = skipped = 0
+        card_to_member = {str(m.member_id).strip().upper(): m for m in Member.objects.all()}
+        existing_borrows = {
+            (br.member_id, br.book_id, br.borrowed_at.date()): br
+            for br in BorrowRecord.objects.filter(borrowed_at__gte=self.since)
+        }
 
-        with transaction.atomic():
-            for row in rows:
-                borrowernumber, itemnumber, biblionumber, issuedate, date_due, returndate, status = row
+        created = updated = skipped = 0
+        to_create_borrows = []
+        to_update_borrows_dict = {}
 
-                member = member_map.get(borrowernumber)
-                book   = book_map.get(biblionumber)
+        for row in rows:
+            borrowernumber, cardnumber, itemnumber, biblionumber, issuedate, date_due, returndate, status = row
 
-                if not member or not book:
-                    skipped += 1
-                    continue
+            card_clean = str(cardnumber or '').strip().upper()
+            member = card_to_member.get(card_clean) or member_map.get(borrowernumber)
+            book   = book_map.get(biblionumber) or Book.objects.filter(isbn=f'KOHA-BIB-{biblionumber}').first()
 
-                if not self.dry_run:
-                    issue_dt   = issuedate if not issuedate or timezone.is_aware(issuedate) else timezone.make_aware(issuedate)
-                    return_dt  = returndate if not returndate or timezone.is_aware(returndate) else timezone.make_aware(returndate)
-                    due_date   = date_due.date() if isinstance(date_due, datetime) else date_due
+            if not member or not book:
+                skipped += 1
+                continue
 
-                    # Determine overdue status
-                    if status == 'borrowed' and due_date and due_date < date.today():
-                        status = 'overdue'
+            issue_dt   = issuedate if not issuedate or timezone.is_aware(issuedate) else timezone.make_aware(issuedate)
+            return_dt  = returndate if not returndate or timezone.is_aware(returndate) else timezone.make_aware(returndate)
+            due_date   = date_due.date() if isinstance(date_due, datetime) else date_due
 
-                    # Calculate gamification points
-                    points = 5 # Base borrow points
-                
-                    if status == 'returned' and return_dt and issue_dt:
-                        duration_hours = (return_dt - issue_dt).total_seconds() / 3600
-                        if duration_hours >= 24:
-                            points += 10 # On-time / valid return
-                            if due_date and return_dt.date() > due_date:
-                                days_late = (return_dt.date() - due_date).days
-                                points -= days_late * 5 # Late penalty
-                    elif status == 'overdue' and due_date:
-                        days_late = (date.today() - due_date).days
-                        points -= days_late * 5 # Live late penalty
-                
-                    # Prevent absurdly negative points for extremely old unreturned books
-                    if points < -50: points = -50
+            if status == 'borrowed' and due_date and due_date < date.today():
+                status = 'overdue'
 
-                    _, flag = BorrowRecord.objects.update_or_create(
-                        member=member,
-                        book=book,
-                        borrowed_at__date=issue_dt.date() if issue_dt else date.today(),
-                        defaults={
-                            'borrowed_at': issue_dt or timezone.now(),
-                            'due_date': due_date or (date.today() + timedelta(days=14)),
-                            'returned_at': return_dt,
-                            'status': status,
-                            'earned_points': points
-                        }
-                    )
-                    if flag:
-                        created += 1
+            points = 5
+            if status == 'returned' and return_dt and issue_dt:
+                duration_hours = (return_dt - issue_dt).total_seconds() / 3600
+                if duration_hours >= 24:
+                    points += 10
+                    if due_date and return_dt.date() > due_date:
+                        days_late = (return_dt.date() - due_date).days
+                        points -= days_late * 5
+            elif status == 'overdue' and due_date:
+                days_late = (date.today() - due_date).days
+                points -= days_late * 5
 
-        self.stdout.write(f'   Borrow records: {created} created, {skipped} skipped')
+            if points < -50: points = -50
+
+            borrow_key = (member.id, book.id, issue_dt.date() if issue_dt else date.today())
+            if borrow_key in existing_borrows:
+                br = existing_borrows[borrow_key]
+                changed = False
+                if br.status != status: br.status = status; changed = True
+                if br.returned_at != return_dt: br.returned_at = return_dt; changed = True
+                if br.earned_points != points: br.earned_points = points; changed = True
+                if changed and br.pk is not None:
+                    to_update_borrows_dict[br.pk] = br
+                    updated += 1
+            else:
+                new_br = BorrowRecord(
+                    member=member,
+                    book=book,
+                    borrowed_at=issue_dt or timezone.now(),
+                    due_date=due_date or (date.today() + timedelta(days=14)),
+                    returned_at=return_dt,
+                    status=status,
+                    earned_points=points
+                )
+                to_create_borrows.append(new_br)
+                existing_borrows[borrow_key] = new_br
+                created += 1
+
+        if not self.dry_run:
+            if to_create_borrows:
+                BorrowRecord.objects.bulk_create(to_create_borrows, batch_size=1000)
+            if to_update_borrows_dict:
+                BorrowRecord.objects.bulk_update(list(to_update_borrows_dict.values()), ['status', 'returned_at', 'earned_points'], batch_size=1000)
+
+        self.stdout.write(f'   Borrow records: {created} created, {updated} updated, {skipped} skipped')

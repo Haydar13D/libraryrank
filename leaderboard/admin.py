@@ -1,7 +1,9 @@
 from django.contrib import admin, messages
 from django.db import transaction
 from unfold.admin import ModelAdmin
-from unfold.decorators import display
+from unfold.decorators import display, action
+from django.core.management import call_command
+import io
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 from django.template.loader import render_to_string
@@ -271,10 +273,47 @@ class MemberAdmin(ModelAdmin):
     list_display = ('member_id', 'name', 'role', 'faculty_code', 'is_active', 'streak_days')
     list_filter = ('role', 'is_active')
     search_fields = ('member_id', 'name', 'department')
+    actions_list = ["sync_koha_action"]
     
     def faculty_code(self, obj):
         return obj.faculty.code if obj.faculty else '-'
     faculty_code.short_description = 'Faculty'
+
+    @action(
+        description="Sync Data dari Koha",
+        url_path="sync-koha",
+        icon="sync",
+    )
+    def sync_koha_action(self, request):
+        lock_acquired = cache.add('koha_sync_in_progress', True, timeout=120)
+        if not lock_acquired:
+            self.message_user(
+                request,
+                "⚠️ Proses sinkronisasi Koha sedang berjalan oleh sesi lain. Harap tunggu sebentar.",
+                level=messages.WARNING
+            )
+            return redirect('admin:leaderboard_member_changelist')
+
+        try:
+            out = io.StringIO()
+            call_command('sync_from_koha', days=30, stdout=out)
+            summary_parts = [l.strip() for l in out.getvalue().splitlines() if any(k in l for k in ['Members:', 'Books:', 'Visits (gate scan):', 'Visits (Koha stats):', 'Borrow records:'])]
+            summary_msg = " | ".join(summary_parts) if summary_parts else "Data anggota dan sirkulasi berhasil diperbarui."
+            self.message_user(
+                request,
+                f"✅ Sinkronisasi Koha Berhasil! {summary_msg}",
+                level=messages.SUCCESS
+            )
+        except Exception as e:
+            self.message_user(
+                request,
+                f"❌ Gagal sinkronisasi dari Koha: {e}",
+                level=messages.ERROR
+            )
+        finally:
+            cache.delete('koha_sync_in_progress')
+
+        return redirect('admin:leaderboard_member_changelist')
 
 
 @admin.register(RedemptionClaim)

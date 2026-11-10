@@ -21,7 +21,7 @@ from django.core.cache import cache
 
 @admin.register(LeaderboardConfig)
 class LeaderboardConfigAdmin(ModelAdmin):
-    list_display = ['reset_mode', 'get_active_reset_date']
+    list_display = ['reset_mode', 'get_active_reset_date', 'exclude_librarians_from_leaderboard', 'allow_librarians_to_redeem']
     change_form_before_template = 'leaderboard/admin/leaderboard_config_banner.html'
     
     conditional_fields = {
@@ -38,7 +38,19 @@ class LeaderboardConfigAdmin(ModelAdmin):
             ),
             'description': 'Pilih sistem reset yang Anda inginkan. Jika memilih Otomatis Semester, sistem akan bekerja mandiri tanpa perlu disetel ulang.'
         }),
+        ('Pengecualian Staf Perpustakaan & Patron Tertentu', {
+            'fields': (
+                'exclude_librarians_from_leaderboard',
+                'allow_librarians_to_redeem',
+                'excluded_cardnumbers',
+            ),
+            'description': 'Atur visibilitas staf perpustakaan (kategori LIBRARIAN di Koha) agar tidak mendominasi klasemen publik pemustaka, serta fleksibilitas hak penukaran merchandise.'
+        }),
     )
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        cache.clear()
     
     def has_add_permission(self, request):
         return not LeaderboardConfig.objects.exists()

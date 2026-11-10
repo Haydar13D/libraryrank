@@ -8,10 +8,10 @@ from django.db import transaction
 from django.utils import timezone
 from django.db import models
 
-from .models import Member, Reward, PointTransaction, RedemptionClaim
+from .models import Member, Reward, PointTransaction, RedemptionClaim, LeaderboardConfig
 from .decorators import require_api_key
 from .views import get_date_range, get_member_total_points
-from .koha_utils import get_live_member_detail
+from .koha_utils import get_live_member_detail, get_patron_category
 
 @csrf_exempt
 @require_api_key
@@ -114,6 +114,12 @@ def integration_redeem(request):
     member = Member.objects.filter(member_id=member_id).first()
     if not member:
         return JsonResponse({'success': False, 'error': 'Member not found.'}, status=404)
+
+    config = LeaderboardConfig.get_config()
+    if not config.allow_librarians_to_redeem:
+        cat_code = get_patron_category(member_id)
+        if cat_code == 'LIBRARIAN':
+            return JsonResponse({'success': False, 'error': 'Librarians are currently not permitted to redeem merchandise.'}, status=403)
         
     reward = Reward.objects.filter(id=reward_id, is_active=True).first()
     if not reward:

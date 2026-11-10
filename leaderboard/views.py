@@ -5,7 +5,7 @@ from datetime import date, timedelta, datetime
 import json
 import hashlib
 from .models import Member, Reward, PointTransaction, RedemptionClaim, Seminar, SeminarRegistration, LeaderboardConfig, LevelTier
-from .koha_utils import get_live_members, get_live_member_detail, get_live_faculties_stats, get_live_books_stats, get_live_daily_visits
+from .koha_utils import get_live_members, get_live_member_detail, get_live_faculties_stats, get_live_books_stats, get_live_daily_visits, get_patron_category
 from .exports import export_excel_response, export_pdf_response
 from django.db import connections
 from django.db.models import Sum
@@ -321,6 +321,15 @@ def api_request_otp(request):
     member = Member.objects.filter(member_id=member_id).first() or _sync_single_member_from_koha(member_id)
     if not member:
         return JsonResponse({'success': False, 'error': 'NIM/ID Anggota tidak terdaftar.'}, status=404)
+
+    config = LeaderboardConfig.get_config()
+    if not config.allow_librarians_to_redeem:
+        cat_code = get_patron_category(member_id)
+        if cat_code == 'LIBRARIAN':
+            return JsonResponse({
+                'success': False,
+                'error': 'Penukaran merchandise saat ini diprioritaskan untuk mahasiswa dan sivitas akademika umum.'
+            }, status=403)
         
     reward = Reward.objects.filter(id=reward_id, is_active=True).first()
     if not reward:

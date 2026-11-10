@@ -762,12 +762,46 @@ class LeaderboardConfig(models.Model):
     yearly_reset_month = models.IntegerField(choices=MONTH_CHOICES, default=8, help_text="Jika memilih 'Otomatis Tahunan', pada tanggal 1 bulan apa reset dilakukan? (Default: Agustus)")
     manual_reset_date = models.DateField(null=True, blank=True, help_text="Jika memilih 'Manual', masukkan tanggal mulainya musim ini. Semua poin sebelum tanggal ini akan diabaikan.")
 
+    # Pengecualian Staf Perpustakaan & Patron Tertentu
+    exclude_librarians_from_leaderboard = models.BooleanField(
+        default=True,
+        verbose_name="Sembunyikan Staf Perpustakaan dari Leaderboard",
+        help_text="Jika aktif, anggota dengan kategori LIBRARIAN tidak akan muncul di podium & tabel perangkingan publik (Web & Kiosk TV)."
+    )
+    allow_librarians_to_redeem = models.BooleanField(
+        default=True,
+        verbose_name="Izinkan Staf Perpustakaan Menukar Merchandise",
+        help_text="Jika aktif, staf perpustakaan tetap dapat menggunakan saldo poinnya untuk menukarkan merchandise."
+    )
+    excluded_cardnumbers = models.TextField(
+        blank=True,
+        default="",
+        verbose_name="NIM / Cardnumber Dikecualikan Tambahan",
+        help_text="Daftar nomor kartu yang ingin disembunyikan dari leaderboard secara manual (pisahkan dengan koma atau baris baru)."
+    )
+
     class Meta:
-        verbose_name = 'Pengaturan Reset Poin'
-        verbose_name_plural = 'Pengaturan Reset Poin'
+        verbose_name = 'Pengaturan Sistem & Klasemen'
+        verbose_name_plural = 'Pengaturan Sistem & Klasemen'
 
     def __str__(self):
         return "Pengaturan Klasemen"
+
+    def get_excluded_cardnumbers_set(self):
+        """Mengembalikan himpunan kartu yang dikecualikan dalam huruf besar."""
+        if not self.excluded_cardnumbers:
+            return set()
+        import re
+        items = re.split(r'[\r\n,]+', self.excluded_cardnumbers)
+        return {item.strip().upper() for item in items if item.strip()}
+
+    @classmethod
+    def get_config(cls):
+        """Mengambil konfigurasi aktif atau membuat default jika belum ada."""
+        config = cls.objects.first()
+        if not config:
+            config = cls.objects.create()
+        return config
 
     @classmethod
     def get_active_reset_date(cls):

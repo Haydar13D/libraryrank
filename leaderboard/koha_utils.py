@@ -3,7 +3,7 @@ import hashlib
 from django.db import connections
 from django.conf import settings
 from django.core.cache import cache
-from .models import PointPolicy, BadgeRule, SystemLog, PointTransaction, LevelTier
+from .models import PointPolicy, BadgeRule, SystemLog, PointTransaction, LevelTier, LeaderboardConfig
 import time
 
 def _get_role_from_category(categorycode):
@@ -266,6 +266,10 @@ def get_live_members(date_from, date_to, search_q=None):
         local_earned = {}
         local_redeemed = {}
         seminar_counts = {}
+
+    config = LeaderboardConfig.get_config()
+    exclude_librarians = config.exclude_librarians_from_leaderboard
+    excluded_cards_set = config.get_excluded_cardnumbers_set()
     
     for row in rows:
         borrowernumber, card, fname, sname, cat, branch, enrolled, v_cnt, b_cnt, prodi_attr, unit_attr, fak_attr = row
@@ -289,6 +293,13 @@ def get_live_members(date_from, date_to, search_q=None):
         cat_upper = (cat or '').upper()
         if 'STATISTICAL' in name_upper or 'ADMIN' in name_upper or 'STAT' in cat_upper:
             continue
+
+        # Pengecualian Staf Perpustakaan & Kartu Tertentu dari Leaderboard Publik
+        if not search_q:
+            if exclude_librarians and cat_upper == 'LIBRARIAN':
+                continue
+            if card_str in excluded_cards_set:
+                continue
             
         # Pencocokan Prodi / Unit / Fakultas dari Koha
         p_code = (prodi_attr or '').strip().upper()
@@ -382,6 +393,7 @@ def get_live_members(date_from, date_to, search_q=None):
             'borrowernumber': borrowernumber,
             'name': full_name,
             'role': role,
+            'categorycode': cat_upper,
             'faculty': faculty,
             'faculty_color': _get_faculty_color(branch),
             'initials': _format_initials(full_name),
@@ -650,3 +662,18 @@ def get_live_daily_visits(date_from, date_to, live_members, is_filtered=False):
         daily_counts[idx] = max_val
         
     return daily_counts
+
+def get_patron_category(cardnumber):
+    """Mengambil categorycode dari tabel borrowers Koha berdasarkan cardnumber."""
+    if not cardnumber:
+        return ''
+    try:
+        with connections['koha'].cursor() as cursor:
+            cursor.execute("SELECT categorycode FROM borrowers WHERE cardnumber = %s LIMIT 1", [str(cardnumber).strip()])
+            row = cursor.fetchone()
+            if row and row[0]:
+                return row[0].strip().upper()
+    except Exception:
+        pass
+    return ''
+
